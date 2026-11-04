@@ -1,0 +1,57 @@
+<!doctype html>
+<html><body style="margin:0;background:#f4f4f5;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#18181b">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:20px;padding:28px">
+<tr><td>
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td><img src="{{ logo_url }}" width="32" height="32" alt="" style="display:block"></td>
+    <td style="padding-left:10px;font-size:15px;font-weight:700">SiteScore <span style="font-weight:400;color:#71717a;font-size:13px">by MAKTECH</span></td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding-top:22px;font-size:15px;color:#52525b">Your results for</td></tr>
+<tr><td style="font-size:22px;font-weight:700;word-break:break-all">{{ host }}</td></tr>
+<tr><td style="padding-top:16px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    {% if agent_items %}
+    <td width="50%" valign="top" style="padding-right:8px">
+      <div style="background:#FFF6F1;border:1px solid #F7C6B1;border-radius:14px;padding:14px 16px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:1px;color:#C03D0B">AI AGENT READINESS</div>
+        <div style="padding-top:6px"><span style="font-size:36px;font-weight:800;line-height:1;color:{{ agent_ink }}">{{ agent.score if agent.score is not none else '--' }}</span><span style="font-size:14px;color:#52525b">/100</span></div>
+        <div style="padding-top:4px;font-size:14px;font-weight:600">{{ agent.label or 'Not checked' }}</div>
+      </div>
+    </td>
+    {% endif %}
+    <td width="{{ '50%' if agent_items else '100%' }}" valign="top" style="padding-left:{{ '8px' if agent_items else '0' }}">
+      <div style="background:#F6F6F9;border:1px solid #E3E3E8;border-radius:14px;padding:14px 16px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:1px;color:#52525b">WEBSITE HEALTH</div>
+        <div style="padding-top:6px"><span style="font-size:36px;font-weight:800;line-height:1;color:{{ band_ink.get(band, '#18181b') }}">{{ score if score is not none else '--' }}</span><span style="font-size:14px;color:#52525b">/100</span></div>
+        <div style="padding-top:4px;font-size:14px;font-weight:600">{{ band_label or 'Partial scan' }}</div>
+      </div>
+    </td>
+  </tr></table>
+</td></tr>
+{% if agent_issues %}
+<tr><td style="padding-top:18px;font-size:15px;font-weight:600">To get ready for AI agents</td></tr>
+{% for r in agent_issues[:3] %}
+<tr><td style="padding-top:8px;font-size:15px;line-height:1.45">
+  <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{{ status_color[r.status] }};margin-right:8px"></span>{{ r.title }}
+</td></tr>
+{% endfor %}
+{% endif %}
+<tr><td style="padding-top:18px;font-size:15px;font-weight:600">{{ verdict }}</td></tr>
+{% if top3 %}
+<tr><td style="padding-top:12px;font-size:15px;font-weight:600">Health: fix these first</td></tr>
+{% for r in top3 %}
+<tr><td style="padding-top:8px;font-size:15px;line-height:1.45">
+  <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{{ status_color[r.status] }};margin-right:8px"></span>{{ r.title }}
+</td></tr>
+{% endfor %}
+{% endif %}
+<tr><td style="padding-top:24px">
+  <a href="{{ link }}" style="display:inline-block;background:#E8511A;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 26px;border-radius:999px">See every finding</a>
+</td></tr>
+<tr><td style="padding-top:18px;font-size:14px;line-height:1.5;color:#52525b">
+  The full report is attached as a PDF. Want us to fix these? Reply to this email or request a call on the results page.
+</td></tr>
+<tr><td style="padding-top:26px;font-size:12px;line-height:1.5;color:#71717a">MAKTECH &middot; Website care, hosting and IT<br>{{ company_address }}</td></tr>
+</table></td></tr></table></body></html>

@@ -1,0 +1,26 @@
+# SiteScore by MAKTECH: free AI agent readiness and website health check.
+# Search engines and AI assistants are welcome to read and recommend the public pages.
+# Results pages (/scan/) are private links, and the sales dashboard (/admin) is staff only.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /scan/
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin
+Disallow: /scan/
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+Sitemap: https://sitescore.maktechgroup.com/sitemap.xml

@@ -1,0 +1,86 @@
+# Rendered by the nginx image at start-up: VITE_API_BASE comes from the container environment.
+# nginx copies server-level add_header lines only into locations that set none, so the
+# page locations repeat them.
+
+# AI agents that ask for Markdown (Accept: text/markdown) get the home page as clean text.
+map $http_accept $sitescore_wants_markdown {
+    default 0;
+    "~*text/markdown" 1;
+}
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml text/plain text/markdown application/xml;
+    gzip_min_length 1024;
+
+    # Text files for agents and search engines, served as UTF-8.
+    charset utf-8;
+    charset_types text/plain text/markdown application/xml text/xml;
+
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    location = /healthz { access_log off; return 200 "ok"; }
+
+    # The home page: HTML for browsers, Markdown for agents that ask for it. The Link header
+    # points agents to the sitemap, the Markdown version and llms.txt (RFC 8288).
+    location = / {
+        if ($sitescore_wants_markdown) {
+            rewrite ^ /index.md last;
+        }
+        add_header Link "</sitemap.xml>; rel=\"sitemap\"; type=\"application/xml\", </index.md>; rel=\"alternate\"; type=\"text/markdown\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\"" always;
+        add_header Vary "Accept" always;
+        add_header Cache-Control "no-cache";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        try_files /index.html =404;
+    }
+
+    location = /index.md {
+        # Only this file: a types block replaces nginx's whole list of file types.
+        types { }
+        default_type text/markdown;
+        add_header Vary "Accept" always;
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        try_files $uri =404;
+    }
+
+    # Files that must exist as themselves, never fall back to the app page.
+    location ~ ^/(robots\.txt|sitemap\.xml|llms\.txt|\.well-known/security\.txt)$ {
+        add_header Cache-Control "public, max-age=3600";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        try_files $uri =404;
+    }
+
+    # Hashed build files never change: cache them for a year.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # Every other path is the single-page app (e.g. /scan/<token>, /admin).
+    location / {
+        add_header Cache-Control "no-cache";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        try_files $uri /index.html;
+    }
+}

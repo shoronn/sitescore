@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------- secrets
+# Real settings live in Coolify, never in Git. Only the example file is committed.
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------- Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------- Node / web app
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+.vite/
+
+# ---------------------------------------------------------------- local data
+*.rdb
+*.db
+*.sqlite
+*.sqlite3
+/data/
+
+# ---------------------------------------------------------------- editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

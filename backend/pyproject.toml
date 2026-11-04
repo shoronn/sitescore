@@ -1,0 +1,46 @@
+[project]
+name = "sitescore"
+version = "1.0.0"
+description = "MAKTECH SiteScore: free website health and security scanner"
+requires-python = ">=3.11"
+dependencies = [
+  "aiosmtplib>=3.0",
+  "alembic>=1.13",
+  "asyncpg>=0.29",
+  "cryptography>=42",
+  "dnspython>=2.6",
+  "email-validator>=2.1",
+  "fastapi>=0.110",
+  "httpx>=0.27",
+  "itsdangerous>=2.1",
+  "Jinja2>=3.1",
+  "pydantic-settings>=2.2",
+  "redis>=5.0",
+  "rq>=1.16",
+  "segno>=1.6",
+  "SQLAlchemy[asyncio]>=2.0",
+  "tldextract>=5.1",
+  "uvicorn[standard]>=0.29",
+  "weasyprint>=62",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "aiosqlite>=0.20"]
+
+[project.scripts]
+sitescore = "sitescore.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sitescore*"]
+
+[tool.setuptools.package-data]
+"sitescore.engine" = ["data/*.json"]
+"sitescore" = ["data/*.txt", "assets/*.png", "assets/fonts/*", "templates/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

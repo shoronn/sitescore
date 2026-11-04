@@ -1,0 +1,14 @@
+# Coolify builds each app from its own folder (backend/ or frontend/), which has its own
+# .dockerignore. This file only matters if an image is ever built from the repository root.
+**/node_modules
+**/dist
+**/build
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+**/*.rdb
+.git
+.github

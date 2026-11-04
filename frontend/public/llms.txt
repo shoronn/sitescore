@@ -1,0 +1,19 @@
+# SiteScore by MAKTECH
+
+> SiteScore is a free website check by MAKTECH, a web development and hosting company in Dhaka, Bangladesh. It answers "Is your website AI agent ready?" with two scores out of 100: AI agent readiness (6 checks based on open standards) and website health (23 checks across security, reliability, email, performance, and search and sharing). Every finding is explained in plain language, and a PDF report is emailed.
+
+Anyone can check any public website at no cost. SiteScore only looks at what any visitor or search engine can already see.
+
+## Pages
+
+- [Home](https://sitescore.maktechgroup.com/): run a free check
+- [Home page as Markdown](https://sitescore.maktechgroup.com/index.md): what SiteScore checks and how it works
+- [About](https://sitescore.maktechgroup.com/about): what the scanner does and never does
+- [Privacy](https://sitescore.maktechgroup.com/privacy): what is collected and why
+- [Terms of use](https://sitescore.maktechgroup.com/terms)
+
+## Contact
+
+- Email: sitescore@maktechgroup.com
+- Phone and WhatsApp: +880 1897 669234
+- MAKTECH, 8th Floor, A, Majid Tower, Ka-24 Progati Sarani Rd, Dhaka 1229, Bangladesh

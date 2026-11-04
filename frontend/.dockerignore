@@ -1,0 +1,11 @@
+# The image installs its own node_modules and builds dist itself.
+node_modules
+dist
+*.tsbuildinfo
+npm-debug.log*
+.vite
+.env
+.env.*
+.git
+.gitignore
+.DS_Store

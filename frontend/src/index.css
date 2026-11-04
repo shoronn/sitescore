@@ -1,0 +1,408 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ tokens
+   The theme comes from data-theme on <html>, set by /theme.js before paint and
+   kept in step by src/theme.ts. "ink" colours are the text-safe versions of the
+   status colours: they keep at least 4.5:1 contrast on their surface. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f2f7;
+  --label: #1d1d1f;
+  --label-2: #4f4f56;
+  --label-3: #65656c;
+  --neutral: #a8a8ad;
+
+  --brand: #f8622d;
+  --brand-deep: #d9480f;
+  --brand-ink: #c03d0b;
+  --pass: #34c759;
+  --warn: #f5b400;
+  --fail: #ff3b30;
+  --pass-ink: #19753a;
+  --warn-ink: #8f5300;
+  --fail-ink: #cf0f20;
+  --blue-ink: #0a5fc2;
+  --purple-ink: #8231b8;
+
+  --tint-brand: rgba(248, 98, 45, 0.13);
+  --tint-pass: rgba(52, 199, 89, 0.15);
+  --tint-warn: rgba(245, 180, 0, 0.18);
+  --tint-fail: rgba(255, 59, 48, 0.12);
+  --tint-blue: rgba(10, 132, 255, 0.12);
+  --tint-purple: rgba(175, 82, 222, 0.13);
+
+  --track: rgba(60, 60, 67, 0.12);
+  --hairline: rgba(60, 60, 67, 0.14);
+  --row-hover: rgba(60, 60, 67, 0.045);
+
+  --glass-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.76));
+  --glass-edge: rgba(255, 255, 255, 0.92);
+  --glass-shine: rgba(255, 255, 255, 1);
+  --glass-shadow: 0 0 0 0.5px rgba(60, 40, 30, 0.07), 0 1px 2px rgba(80, 35, 10, 0.05), 0 12px 26px -16px rgba(120, 45, 10, 0.2);
+  --glass-hover: rgba(255, 255, 255, 0.5);
+  --sheet-bg: rgba(250, 250, 252, 0.97);
+  --menu-bg: rgba(255, 255, 255, 0.94);
+  --overlay: rgba(10, 10, 15, 0.3);
+
+  --field-fill: rgba(118, 118, 128, 0.1);
+  --field-edge: rgba(60, 60, 67, 0.07);
+  --field-focus: #ffffff;
+  --focus-ring: 0 0 0 4px rgba(248, 98, 45, 0.2);
+  --autofill: #fff4ee;
+  --skeleton: rgba(120, 120, 128, 0.14);
+  --skeleton-shine: rgba(255, 255, 255, 0.65);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --label: #f5f5f7;
+  --label-2: #b4b4ba;
+  --label-3: #9b9ba2;
+  --neutral: #5f5f64;
+
+  --brand-ink: #ff8f63;
+  --pass: #30d158;
+  --warn: #ffcc00;
+  --fail: #ff453a;
+  --pass-ink: #4cd964;
+  --warn-ink: #ffd426;
+  --fail-ink: #ff7a72;
+  --blue-ink: #6cb1ff;
+  --purple-ink: #d39cff;
+
+  --tint-brand: rgba(248, 98, 45, 0.2);
+  --tint-pass: rgba(48, 209, 88, 0.18);
+  --tint-warn: rgba(255, 204, 0, 0.16);
+  --tint-fail: rgba(255, 69, 58, 0.18);
+  --tint-blue: rgba(10, 132, 255, 0.22);
+  --tint-purple: rgba(191, 90, 242, 0.22);
+
+  --track: rgba(235, 235, 245, 0.13);
+  --hairline: rgba(235, 235, 245, 0.12);
+  --row-hover: rgba(255, 255, 255, 0.05);
+
+  --glass-fill: linear-gradient(180deg, rgba(52, 52, 56, 0.74), rgba(28, 28, 31, 0.7));
+  --glass-edge: rgba(255, 255, 255, 0.11);
+  --glass-shine: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -18px rgba(0, 0, 0, 0.7);
+  --glass-hover: rgba(255, 255, 255, 0.06);
+  --sheet-bg: rgba(28, 28, 30, 0.97);
+  --menu-bg: rgba(44, 44, 46, 0.96);
+  --overlay: rgba(0, 0, 0, 0.55);
+
+  --field-fill: rgba(118, 118, 128, 0.24);
+  --field-edge: rgba(255, 255, 255, 0.04);
+  --field-focus: rgba(0, 0, 0, 0.35);
+  --focus-ring: 0 0 0 4px rgba(248, 98, 45, 0.32);
+  --autofill: #2b211c;
+  --skeleton: rgba(235, 235, 245, 0.1);
+  --skeleton-shine: rgba(255, 255, 255, 0.08);
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--label);
+  background: var(--bg);
+  font-family: theme("fontFamily.sans");
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: rgba(248, 98, 45, 0.28); }
+
+/* Pages are a column, so the footer sits at the bottom even on short pages. */
+#root { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* The page keeps its scrollbar space (scrollbar-gutter above), so the dialog's scroll lock
+   must not add its own right margin, or the page would jump sideways when the sheet opens. */
+html body[data-scroll-locked] { margin-right: 0 !important; }
+
+/* The orange light field the glass sits on. */
+.light-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Its own compositor layer: painted once, never repainted while scrolling. */
+  transform: translateZ(0);
+  will-change: transform;
+  background:
+    radial-gradient(60vmax 45vmax at 105% -10%, rgba(248, 98, 45, 0.4), transparent 62%),
+    radial-gradient(50vmax 40vmax at -20% 30%, rgba(255, 170, 120, 0.3), transparent 60%),
+    radial-gradient(45vmax 35vmax at 70% 110%, rgba(248, 98, 45, 0.18), transparent 60%);
+}
+:root[data-theme="dark"] .light-field {
+  background:
+    radial-gradient(60vmax 45vmax at 105% -10%, rgba(248, 98, 45, 0.34), transparent 62%),
+    radial-gradient(50vmax 40vmax at -20% 30%, rgba(217, 72, 15, 0.2), transparent 60%),
+    radial-gradient(45vmax 35vmax at 70% 110%, rgba(248, 98, 45, 0.12), transparent 60%);
+}
+
+@layer components {
+  /* Liquid-glass surface: translucent fill, bright top edge, hairline and soft lift.
+     No backdrop blur here: the cards sit on a smooth gradient where blur adds nothing
+     visible, and blurring every card on every scroll frame was the cause of janky
+     scrolling. Real blur is kept for things that float over content (.glass-float). */
+  .glass {
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-edge);
+    box-shadow: inset 0 1px 0 var(--glass-shine), var(--glass-shadow);
+    background-clip: padding-box;
+  }
+  .glass-float {
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    backdrop-filter: blur(24px) saturate(1.8);
+  }
+
+  /* Page width shared by header, content and footer: roomy on 1080p screens, never wider
+     than a comfortable reading span. */
+  /* 1440 px wide content on large screens: about three quarters of a 1080p display. */
+  .shell { @apply mx-auto w-full max-w-[1440px] px-5 sm:px-6 lg:px-8 2xl:px-10; }
+
+  /* ---------------------------------------------------------- buttons */
+  .btn-primary {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-capsule px-6 font-semibold text-white;
+    min-height: 52px;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    background: linear-gradient(180deg, #fb6a33 0%, #e8511a 55%, #cf430c 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+      0 1px 2px rgba(150, 50, 10, 0.25), 0 10px 22px -10px rgba(217, 72, 15, 0.65);
+    text-shadow: 0 1px 1px rgba(120, 30, 0, 0.25);
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+  .btn-primary[aria-busy="true"] { cursor: progress; filter: saturate(0.85); }
+  .btn-primary:disabled:not([aria-busy="true"]) {
+    cursor: not-allowed;
+    color: var(--label-3);
+    background: var(--field-fill);
+    box-shadow: inset 0 0 0 1px var(--field-edge);
+    text-shadow: none;
+  }
+
+  /* Destructive actions: a fixed deep red keeps white text readable in both themes. */
+  .btn-danger {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-capsule px-6 font-semibold text-white;
+    min-height: 52px;
+    font-size: 17px;
+    background: #c8102e;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 22px -12px rgba(200, 16, 46, 0.7);
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .btn-danger:active:not(:disabled) { transform: scale(0.97); }
+  .btn-danger:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  .btn-glass {
+    @apply glass inline-flex select-none items-center justify-center gap-2 rounded-capsule px-5 font-semibold;
+    min-height: 48px;
+    font-size: 16px;
+    color: var(--label);
+    transition: transform 0.15s ease, background-color 0.15s ease;
+  }
+  .btn-glass:active:not(:disabled) { transform: scale(0.97); }
+  .btn-glass:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .icon-btn {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full;
+    color: var(--label);
+    transition: transform 0.15s ease;
+  }
+  .icon-btn:active { transform: scale(0.94); }
+
+  .link-btn {
+    @apply inline-flex items-center gap-1 rounded-lg font-semibold;
+    min-height: 40px;
+    color: var(--brand-ink);
+  }
+  .link-btn:disabled { color: var(--label-3); cursor: not-allowed; }
+  .link-quiet { @apply link-btn font-medium; color: var(--label-2); }
+
+  /* ---------------------------------------------------------- fields */
+  .field {
+    @apply w-full rounded-2xl px-4 outline-none;
+    min-height: 52px;
+    font-size: 17px;
+    background: var(--field-fill);
+    color: var(--label);
+    border: 1px solid var(--field-edge);
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .field::placeholder { color: var(--label-3); opacity: 1; }
+  .field:focus, .field:focus-visible { outline: none; border-color: var(--brand); background: var(--field-focus); box-shadow: var(--focus-ring); }
+  .field[aria-invalid="true"] { border-color: var(--fail-ink); }
+  .field[aria-invalid="true"]:focus { box-shadow: 0 0 0 4px var(--tint-fail); }
+  textarea.field { resize: vertical; line-height: 1.45; }
+
+  /* The website box on the home page: the whole pill shows focus. */
+  .search-pill:focus-within { box-shadow: inset 0 1px 0 var(--glass-shine), var(--glass-shadow), var(--focus-ring); border-color: rgba(248, 98, 45, 0.55); }
+  .search-pill input:focus, .search-pill input:focus-visible { outline: none; }
+
+  /* ---------------------------------------------------------- lists and rows */
+  .row-btn { transition: background-color 0.15s ease; }
+  .row-btn:focus-visible { outline-offset: -3px; border-radius: 4px; }
+
+  .chip {
+    @apply inline-flex shrink-0 select-none items-center gap-1.5 rounded-capsule px-4 font-medium;
+    min-height: 40px;
+    font-size: 15px;
+    color: var(--label);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .chip[aria-pressed="true"], .chip[aria-checked="true"] { color: var(--bg); }
+  .chip-thumb { background: var(--label); }
+
+  .segmented {
+    @apply inline-flex rounded-capsule p-[3px];
+    background: var(--field-fill);
+    border: 1px solid var(--field-edge);
+  }
+  .segmented-item {
+    @apply inline-flex items-center gap-1.5 rounded-capsule px-3 text-[13px] font-medium;
+    min-height: 32px;
+    color: var(--label-2);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .segmented-item[aria-checked="true"] { color: var(--label); }
+  .segmented-thumb {
+    background: var(--field-focus);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  }
+  :root[data-theme="dark"] .segmented-thumb { background: rgba(255, 255, 255, 0.16); }
+
+  .menu-pop {
+    border-radius: 18px;
+    background: var(--menu-bg);
+    border: 1px solid var(--glass-edge);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 12px 40px -8px rgba(0, 0, 0, 0.3);
+    animation: pop-in 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+    transform-origin: var(--radix-dropdown-menu-content-transform-origin, top right);
+  }
+  .menu-pop[data-state="closed"] { animation: pop-out 0.12s ease-in forwards; }
+  .menu-item {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium;
+    min-height: 44px;
+    color: var(--label);
+  }
+  .menu-item:focus-visible { outline-offset: -2px; }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--skeleton) 0%, var(--skeleton-shine) 50%, var(--skeleton) 100%) var(--skeleton);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 8px;
+  }
+
+  .footer-link {
+    @apply inline-flex items-center rounded-lg px-2;
+    min-height: 40px;
+  }
+
+  .text-2 { color: var(--label-2); }
+  .text-3 { color: var(--label-3); }
+  .hairline { border-color: var(--hairline); }
+  .ink-brand { color: var(--brand-ink); }
+  .ink-pass { color: var(--pass-ink); }
+  .ink-warn { color: var(--warn-ink); }
+  .ink-fail { color: var(--fail-ink); }
+}
+
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+  .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn-glass:hover:not(:disabled), .icon-btn.glass:hover { background: linear-gradient(var(--glass-hover), var(--glass-hover)), var(--glass-fill); }
+  .row-btn:hover:not(:disabled) { background: var(--row-hover); }
+  .chip:hover:not([aria-pressed="true"]):not([aria-checked="true"]) { background: linear-gradient(var(--glass-hover), var(--glass-hover)), var(--glass-fill); }
+  .menu-item:hover { background: var(--row-hover); }
+  .segmented-item:hover:not([aria-checked="true"]) { color: var(--label); }
+  .link-btn:hover:not(:disabled), .footer-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .footer-link:hover { color: var(--label); }
+}
+
+:focus-visible {
+  outline: 3px solid rgba(248, 98, 45, 0.6);
+  outline-offset: 2px;
+}
+
+/* Browser autofill keeps the field colours instead of its own yellow or blue. */
+input.field:-webkit-autofill,
+input.field:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--label);
+  box-shadow: inset 0 0 0 1000px var(--autofill);
+  caret-color: var(--label);
+  transition: background-color 9999s ease 0s;
+}
+input.field:-webkit-autofill:focus { box-shadow: inset 0 0 0 1000px var(--autofill), var(--focus-ring); }
+
+.tabular { font-variant-numeric: tabular-nums; }
+.balance { text-wrap: balance; }
+
+/* ---------------------------------------------------------- motion */
+@keyframes breathe { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.seg-pending { animation: breathe 1.6s ease-in-out infinite; }
+
+/* Home page ring: the shaded segments turn slowly. Only a transform changes, so the graphics
+   card moves the ring without repainting it (animating each segment's opacity repainted
+   the whole ring on every frame). */
+@keyframes turn { to { transform: rotate(360deg); } }
+.ring-idle { animation: turn 14s linear infinite; will-change: transform; }
+
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
+
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes pop-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.96); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.sheet-enter { animation: sheet-in 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
+@media (min-width: 640px) { .sheet-enter { animation: pop-in 0.22s cubic-bezier(0.32, 0.72, 0, 1); transform-origin: center; } }
+.fade-enter { animation: fade-in 0.25s ease; }
+.rise-enter { animation: rise-in 0.3s ease both; }
+/* Page and headline entrances start part-visible, never at zero: content then counts as
+   painted from the first frame, so first paint and the largest content (speed scores)
+   never wait for an animation. */
+@keyframes page-in { from { opacity: 0.4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.page-enter { animation: page-in 0.35s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@keyframes hero-in { from { opacity: 0.35; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes ring-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+.hero-in { animation: hero-in 0.6s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.hero-ring { animation: ring-in 0.8s cubic-bezier(0.32, 0.72, 0, 1) 60ms both; }
+.shake { animation: shake 0.4s ease; }
+.caret { animation: blink 1s steps(1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-pending, .ring-idle, .spin, .sheet-enter, .fade-enter, .rise-enter, .page-enter, .hero-in, .hero-ring, .shake, .caret, .menu-pop, .menu-pop[data-state="closed"], .skeleton { animation: none; }
+  .btn-primary, .btn-glass, .icon-btn, .field, .chip { transition: none; }
+}
+
+/* QR codes from the API scale to their frame. */
+.qr svg { display: block; width: 100%; height: auto; }
+
+/* Long-form text on the About, Privacy and Terms pages. */
+.info-prose { font-size: 17px; line-height: 1.6; max-width: 68ch; }
+.info-prose > * + * { margin-top: 0.9em; }
+.info-prose h2 { font-family: theme("fontFamily.display"); font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin-top: 1.6em; }
+.info-prose ul { list-style: disc; padding-left: 1.25em; }
+.info-prose li + li { margin-top: 0.35em; }
+.info-prose li::marker { color: var(--label-3); }
+.info-prose a { color: var(--brand-ink); font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.info-prose code { font-size: 14px; padding: 2px 6px; border-radius: 6px; background: var(--field-fill); word-break: break-all; }
