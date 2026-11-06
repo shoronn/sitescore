@@ -1,4 +1,5 @@
-import { Activity, Bot, Gauge, Mail, Search, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Accessibility, Activity, Bot, Gauge, Mail, Search, ShieldCheck, type LucideIcon } from "lucide-react";
+import type { MessageKey } from "./i18n";
 
 export interface CheckInfo {
   key: string;
@@ -6,7 +7,7 @@ export interface CheckInfo {
   category: CategoryKey;
 }
 
-export type CategoryKey = "security" | "reliability" | "email" | "performance" | "seo";
+export type CategoryKey = "security" | "reliability" | "email" | "performance" | "seo" | "content";
 
 export interface AgentCheckInfo {
   key: string;
@@ -55,13 +56,34 @@ export const CHECKS: CheckInfo[] = [
   { key: "dkim", name: "DKIM", category: "email" },
   { key: "dmarc", name: "DMARC", category: "email" },
   { key: "blacklist", name: "Blocklists", category: "email" },
+  { key: "mta_sts", name: "Encrypted mail delivery", category: "email" },
   { key: "mobile_speed", name: "Mobile speed score", category: "performance" },
   { key: "web_vitals", name: "Core Web Vitals", category: "performance" },
   { key: "meta_tags", name: "Title and description", category: "seo" },
   { key: "mobile_viewport", name: "Mobile-friendly setup", category: "seo" },
   { key: "indexing", name: "Search engine access", category: "seo" },
+  { key: "canonical", name: "Main page address", category: "seo" },
+  { key: "structured_data", name: "Business details for Google", category: "seo" },
+  { key: "error_page", name: "Missing-page handling", category: "seo" },
   { key: "social_preview", name: "Sharing preview", category: "seo" },
+  { key: "accessibility", name: "Accessibility", category: "content" },
+  { key: "headings", name: "Page headings", category: "content" },
+  { key: "image_alt", name: "Image descriptions", category: "content" },
+  { key: "content_depth", name: "Amount of text", category: "content" },
+  { key: "contact_info", name: "Contact details", category: "content" },
+  { key: "page_basics", name: "Page basics", category: "content" },
 ];
+
+/** Checks that wait for the browser speed test (Lighthouse), the slow part of a scan. */
+export const SLOW_KEYS = new Set(["mobile_speed", "web_vitals", "accessibility"]);
+
+/** The name of a check in the visitor's language. */
+export const checkName = (key: string) => `check.${key}` as MessageKey;
+/** The one-line description of an AI agent check. */
+export const checkBlurb = (key: string) => `blurb.${key}` as MessageKey;
+/** The name and description of an area. */
+export const areaName = (key: string) => `area.${key}` as MessageKey;
+export const areaBlurb = (key: string) => `area.${key}_blurb` as MessageKey;
 
 /** Every check in a scan, for progress: agent checks first, then health. */
 export const ALL_CHECK_KEYS: string[] = [...AGENT_CHECKS.map((c) => c.key), ...CHECKS.map((c) => c.key)];
@@ -71,5 +93,6 @@ export const CATEGORIES: { key: CategoryKey; label: string; icon: LucideIcon; bl
   { key: "reliability", label: "Reliability", icon: Activity, blurb: "Uptime, response time, domain expiry and DNS" },
   { key: "email", label: "Email", icon: Mail, blurb: "SPF, DKIM, DMARC and spam blocklists" },
   { key: "performance", label: "Performance", icon: Gauge, blurb: "Mobile speed score and Core Web Vitals, measured in a real browser" },
-  { key: "seo", label: "Search and sharing", icon: Search, blurb: "Google listing, mobile setup, sitemap and sharing preview" },
+  { key: "seo", label: "Search and sharing", icon: Search, blurb: "Google listing, business details, mobile setup and sharing preview" },
+  { key: "content", label: "Content and accessibility", icon: Accessibility, blurb: "Headings, text, image descriptions, contact details and accessibility" },
 ];

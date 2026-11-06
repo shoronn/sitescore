@@ -113,7 +113,7 @@ def _legacy_tls(host: str, timeout: float, address: str | None = None) -> bool |
         return None
 
 
-@check("ssl", "SSL certificate", Category.SECURITY, 8)
+@check("ssl", "SSL certificate", Category.SECURITY, 7)
 async def check_ssl(ctx) -> Outcome:
     t = ctx.settings.http_timeout
     info = await asyncio.to_thread(_probe_tls, ctx.host, t, ctx.connect_address)
@@ -124,6 +124,10 @@ async def check_ssl(ctx) -> Outcome:
     days = info.get("days_left")
     if not info["verified"]:
         err = (info.get("verify_error") or "").lower()
+        if "unable to get local issuer" in err or "unable to verify the first certificate" in err:
+            # The certificate is fine but the server leaves out the middle certificate. Desktop
+            # browsers often fetch it themselves; many phones, apps and other servers do not.
+            return Outcome(Status.FAIL, info, "incomplete_chain")
         reason = "expired" if "expired" in err or (days is not None and days < 0) else (
             "hostname" if "hostname" in err or "ip address mismatch" in err else (
                 "self_signed" if "self" in err else "invalid"))
@@ -150,7 +154,7 @@ HEADER_LABELS = {
 }
 
 
-@check("headers", "Security headers", Category.SECURITY, 5)
+@check("headers", "Security headers", Category.SECURITY, 4)
 async def check_headers(ctx) -> Outcome:
     page = await ctx.main_page()
     if not page.ok:
@@ -217,7 +221,7 @@ def detect_software(headers: dict[str, str], html: str) -> list[dict]:
     return found
 
 
-@check("software", "Software versions", Category.SECURITY, 7)
+@check("software", "Software versions", Category.SECURITY, 6)
 async def check_software(ctx) -> Outcome:
     page = await ctx.main_page()
     if not page.ok:
@@ -237,7 +241,7 @@ async def check_software(ctx) -> Outcome:
 # ---------------------------------------------------------------- Uptime and response time
 
 
-@check("uptime", "Uptime and response time", Category.RELIABILITY, 9)
+@check("uptime", "Uptime and response time", Category.RELIABILITY, 8)
 async def check_uptime(ctx) -> Outcome:
     page = await ctx.main_page()
     url = page.final_url or f"https://{ctx.host}/"

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from ..models import Category, Outcome, Status
-from ..speedtest import lab_metrics
+from ..speedtest import final_screenshot, lab_metrics, speed_fixes
 from .base import check
 
 # Lighthouse's own errors that mean the page itself did not load properly.
@@ -38,7 +38,7 @@ def _failed(data: dict) -> Outcome:
     return Outcome(Status.NOT_CHECKED, ev, "speed_failed")
 
 
-@check("mobile_speed", "Mobile speed score", Category.PERFORMANCE, 9, slow=True)
+@check("mobile_speed", "Mobile speed score", Category.PERFORMANCE, 8, slow=True)
 async def check_mobile_speed(ctx) -> Outcome:
     data = await ctx.speed_test()
     if "lhr" not in data:
@@ -46,6 +46,11 @@ async def check_mobile_speed(ctx) -> Outcome:
     m = _source(data, lab_metrics(data["lhr"]))
     if "score" not in m:
         return Outcome(Status.NOT_CHECKED, m, "speed_failed")
+    # What would save the most time, and what the page looked like on the test phone.
+    m["fixes"] = speed_fixes(data["lhr"])
+    shot = final_screenshot(data["lhr"])
+    if shot:
+        m["screenshot"] = shot
     if m["score"] >= 90:
         return Outcome(Status.PASS, m, "ok")
     if m["score"] >= 50:
@@ -53,7 +58,7 @@ async def check_mobile_speed(ctx) -> Outcome:
     return Outcome(Status.FAIL, m, "poor")
 
 
-@check("web_vitals", "Core Web Vitals", Category.PERFORMANCE, 6, slow=True)
+@check("web_vitals", "Core Web Vitals", Category.PERFORMANCE, 5, slow=True)
 async def check_web_vitals(ctx) -> Outcome:
     """Loading (LCP), visual stability (CLS) and responsiveness.
 

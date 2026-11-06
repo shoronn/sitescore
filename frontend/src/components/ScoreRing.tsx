@@ -2,6 +2,7 @@ import { m } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Band, Status } from "../api";
 import { CHECKS } from "../checks";
+import { useT } from "../i18n";
 import { EASE_OUT } from "../motion";
 
 const STATUS_COLOR: Record<Status, string> = {
@@ -82,11 +83,12 @@ export default function ScoreRing({ statuses, running = false, score, band, size
   const idle = !hasScore && !running && done === 0;
   const shown = useCountUp(hasScore ? score : null);
   const mountedAt = useRef(performance.now());
+  const { t, n: num } = useT();
   const label = hasScore
-    ? `Score ${score} out of 100${caption ? `, ${caption}` : ""}`
+    ? `${t("ring.score", { score })}${caption ? `, ${caption}` : ""}`
     : running
-      ? `Checking: ${done} of ${n} checks done`
-      : `${n} checks`;
+      ? t("ring.checking", { done, total: n })
+      : t("ring.checks", { n });
 
   // The glass lens sits inside the ring with a little air, so its edge never cuts a segment.
   const lensInset = size * ((C - R + STROKE / 2 + 7) / 200);
@@ -148,24 +150,24 @@ export default function ScoreRing({ statuses, running = false, score, band, size
               className="tabular font-display font-bold leading-none tracking-[-0.03em]"
               style={{ fontSize: size * 0.29, color: band ? BAND_INK[band] : "var(--label)" }}
             >
-              {shown ?? score}
+              {num(shown ?? score)}
             </div>
-            <div className="text-2 mt-1.5 text-[15px] font-semibold">{caption ?? "out of 100"}</div>
+            <div className="text-2 mt-1.5 text-[15px] font-semibold">{caption ?? t("out_of_100")}</div>
           </>
         ) : running ? (
           <>
             <div className="tabular font-display font-semibold leading-none tracking-tight" style={{ fontSize: size * 0.17 }}>
-              {done}
-              <span className="text-3">/{n}</span>
+              {num(done)}
+              <span className="text-3">/{num(n)}</span>
             </div>
-            <div className="text-2 mt-2 text-[15px] font-medium">checks done</div>
+            <div className="text-2 mt-2 text-[15px] font-medium">{t("ring.done")}</div>
           </>
         ) : (
           <>
             <div className="tabular font-display font-bold leading-none tracking-tight" style={{ fontSize: size * 0.21 }}>
-              {n}
+              {num(n)}
             </div>
-            <div className="text-2 mt-2 text-[15px] font-medium">checks, free</div>
+            <div className="text-2 mt-2 text-[15px] font-medium">{t("ring.free")}</div>
           </>
         )}
       </div>

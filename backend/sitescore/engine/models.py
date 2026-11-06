@@ -19,11 +19,13 @@ class Category(str, Enum):
     EMAIL = "email"
     PERFORMANCE = "performance"
     SEO = "seo"
+    CONTENT = "content"
     # Scored on its own (scoring.agent_score), not part of the health score.
     AGENT = "agent"
 
 
-HEALTH_CATEGORIES = (Category.SECURITY, Category.RELIABILITY, Category.EMAIL, Category.PERFORMANCE, Category.SEO)
+HEALTH_CATEGORIES = (Category.SECURITY, Category.RELIABILITY, Category.EMAIL, Category.PERFORMANCE, Category.SEO,
+                     Category.CONTENT)
 
 CATEGORY_LABELS = {
     Category.SECURITY: "Security",
@@ -31,6 +33,7 @@ CATEGORY_LABELS = {
     Category.EMAIL: "Email",
     Category.PERFORMANCE: "Performance",
     Category.SEO: "Search and sharing",
+    Category.CONTENT: "Content and accessibility",
     Category.AGENT: "AI agent readiness",
 }
 

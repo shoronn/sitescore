@@ -1,4 +1,8 @@
+import { getLang, translate, type Lang } from "./i18n";
+
 export type Status = "pass" | "warn" | "fail" | "not_checked";
+/** How serious a finding is: error (fail), warning, notice (a small improvement), good or not checked. */
+export type Severity = "error" | "warning" | "notice" | "good" | "not_checked";
 export type Band = "good" | "attention" | "risk";
 
 export interface CheckResult {
@@ -7,6 +11,7 @@ export interface CheckResult {
   category: string;
   weight: number;
   status: Status;
+  severity: Severity;
   points: number;
   title: string;
   summary: string;
@@ -32,8 +37,30 @@ export interface CategoryScore {
   available: number;
 }
 
+/** The findings grouped by what they mean for the business, e.g. "Your emails may land in spam". */
+export interface ImpactGroup {
+  key: string;
+  status: "error" | "warning" | "good" | "not_checked";
+  label: string;
+  count: string;
+  problems: number;
+  notices: number;
+  top: string[];
+  checks: string[];
+}
+
+/** One change that would make the homepage load faster, with the time it would save. */
+export interface SpeedFix {
+  id: string;
+  title: string;
+  detail: string;
+  seconds: number;
+  saving: string;
+}
+
 export interface Scan {
   token: string;
+  lang: Lang;
   status: "queued" | "running" | "done" | "failed";
   host: string;
   created_at: string;
@@ -48,6 +75,10 @@ export interface Scan {
   agent: AgentScore;
   categories: CategoryScore[];
   results: CheckResult[];
+  impact: ImpactGroup[];
+  speed_fixes: SpeedFix[];
+  /** The homepage as the test phone showed it (a data: URL), when the speed test ran. */
+  screenshot: string | null;
   pending: string[];
   error?: { code: string; message: string };
   is_owner: boolean;
@@ -77,7 +108,7 @@ export class ApiError extends Error {
   code: string;
   field?: string;
   constructor(status: number, body: { error?: string; message?: string; field?: string }) {
-    super(body.message || "Something went wrong. Please try again.");
+    super(body.message || translate(getLang(), "error.generic"));
     this.status = status;
     this.code = body.error || "error";
     this.field = body.field;
@@ -90,13 +121,16 @@ export const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "")
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
+    // Error messages come back in the visitor's language.
+    const headers: Record<string, string> = { "Accept-Language": getLang() };
+    if (init?.body) headers["Content-Type"] = "application/json";
     res = await fetch(`${API_BASE}/api${path}`, {
       credentials: "include", // the session cookie lives on the API domain
-      headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+      headers,
       ...init,
     });
   } catch {
-    throw new ApiError(0, { error: "offline", message: "Could not reach SiteScore. Check your connection and try again." });
+    throw new ApiError(0, { error: "offline", message: translate(getLang(), "offline") });
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, body);
@@ -117,10 +151,10 @@ export const api = {
     phone?: string;
     turnstile_token?: string;
   }) => post<{ ok: true; lead: Lead }>("/auth/start", data),
-  startScan: (url: string) => post<{ token: string; reused: boolean }>("/scans", { url }),
-  scan: (token: string) => call<Scan>(`/scans/${encodeURIComponent(token)}`),
+  startScan: (url: string, lang: Lang) => post<{ token: string; reused: boolean }>("/scans", { url, lang }),
+  scan: (token: string, lang: Lang) => call<Scan>(`/scans/${encodeURIComponent(token)}?lang=${lang}`),
   requestCallback: (token: string) => post<{ ok: true }>(`/scans/${encodeURIComponent(token)}/callback`),
-  reportUrl: (token: string) => `${API_BASE}/api/scans/${encodeURIComponent(token)}/report.pdf`,
+  reportUrl: (token: string, lang: Lang) => `${API_BASE}/api/scans/${encodeURIComponent(token)}/report.pdf?lang=${lang}`,
 };
 
 // ---------------------------------------------------------------- sales dashboard

@@ -194,7 +194,7 @@ export default function AdminLead() {
                           <ExternalLink size={15} aria-hidden="true" /> Results
                         </a>
                         {s.status === "done" ? (
-                          <a className="btn-glass min-h-[38px] px-3.5 text-[14px]" href={api.reportUrl(s.token)}>
+                          <a className="btn-glass min-h-[38px] px-3.5 text-[14px]" href={api.reportUrl(s.token, "en")}>
                             <Download size={15} aria-hidden="true" /> PDF
                           </a>
                         ) : null}

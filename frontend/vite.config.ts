@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { defineConfig, type Plugin } from "vite";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { build, defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 const SITE = "https://sitescore.maktechgroup.com";
@@ -64,8 +67,48 @@ function inlineThemeScript(): Plugin {
   };
 }
 
+/**
+ * After the build, render the home page to HTML and put it in index.html, so its text is in
+ * the page as sent: visitors see it before the script runs, and AI agents and social apps that
+ * never run scripts can read it. Every other page uses app.html, the same page with an empty
+ * root (nginx serves it for the app's routes, and with status 404 for unknown addresses).
+ */
+function prerenderHome(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "sitescore-prerender-home",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      // A small server build of the home page, bundled with everything it needs, then run here.
+      const tmp = mkdtempSync(join(tmpdir(), "sitescore-prerender-"));
+      try {
+        await build({
+          configFile: false,
+          root: resolve(__dirname),
+          plugins: [react()],
+          logLevel: "error",
+          ssr: { noExternal: true, target: "node" },
+          build: { ssr: "src/prerender.tsx", outDir: tmp, emptyOutDir: true, rollupOptions: { output: { format: "esm" } } },
+        });
+        const { renderHome } = (await import(pathToFileURL(join(tmp, "prerender.js")).href)) as { renderHome: () => string };
+        const html = readFileSync(`${outDir}/index.html`, "utf8");
+        const empty = '<div id="root"></div>';
+        if (!html.includes(empty)) throw new Error("index.html has no empty root to fill.");
+        // The canonical link belongs to the home page alone.
+        writeFileSync(`${outDir}/app.html`, html.replace(/\s*<!-- home-only -->[\s\S]*?<!-- \/home-only -->/, ""));
+        writeFileSync(`${outDir}/index.html`, html.replace(empty, `<div id="root">${renderHome()}</div>`));
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), siteFiles(), inlineThemeScript()],
+  plugins: [react(), siteFiles(), inlineThemeScript(), prerenderHome()],
   server: {
     port: 5173,
     proxy: { "/api": { target: process.env.SITESCORE_API ?? "http://localhost:8077", changeOrigin: false } },

@@ -1,28 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ t.html_lang }}">
 <head>
 <meta charset="utf-8">
-<title>SiteScore report for {{ host }}</title>
+<title>{{ t.title.format(host=host) }}</title>
 <style>
   @font-face { font-family: "Inter"; src: url("assets/fonts/Inter-Regular.otf"); font-weight: 400; }
   @font-face { font-family: "Inter"; src: url("assets/fonts/Inter-Medium.otf"); font-weight: 500; }
   @font-face { font-family: "Inter"; src: url("assets/fonts/Inter-SemiBold.otf"); font-weight: 600; }
   @font-face { font-family: "Inter"; src: url("assets/fonts/Inter-Bold.otf"); font-weight: 700; }
   @font-face { font-family: "Inter Display"; src: url("assets/fonts/InterDisplay-Bold.otf"); font-weight: 700; }
+  @font-face { font-family: "Noto Sans Bengali"; src: url("assets/fonts/NotoSansBengali-Regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "Noto Sans Bengali"; src: url("assets/fonts/NotoSansBengali-Medium.ttf"); font-weight: 500; }
+  @font-face { font-family: "Noto Sans Bengali"; src: url("assets/fonts/NotoSansBengali-SemiBold.ttf"); font-weight: 600; }
+  @font-face { font-family: "Noto Sans Bengali"; src: url("assets/fonts/NotoSansBengali-Bold.ttf"); font-weight: 700; }
 
   /* White, print-friendly A4. Text colours keep at least 4.5:1 contrast on white. */
   @page {
     size: A4;
     margin: 20mm 16mm 18mm 16mm;
-    @top-left { content: "SiteScore report  ·  {{ host }}"; font: 500 7.5pt Inter, "DejaVu Sans", sans-serif; color: #6B6B72; }
-    @top-right { content: "{{ date }}"; font: 500 7.5pt Inter, "DejaVu Sans", sans-serif; color: #6B6B72; }
-    @bottom-left { content: "MAKTECH SiteScore  ·  sitescore.maktechgroup.com"; font: 7.5pt Inter, "DejaVu Sans", sans-serif; color: #6B6B72; }
-    @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt Inter, "DejaVu Sans", sans-serif; color: #6B6B72; }
+    @top-left { content: "{{ t.running_head }}  ·  {{ host }}"; font: 500 7.5pt Inter, "Noto Sans Bengali", "DejaVu Sans", sans-serif; color: #6B6B72; }
+    @top-right { content: "{{ date }}"; font: 500 7.5pt Inter, "Noto Sans Bengali", "DejaVu Sans", sans-serif; color: #6B6B72; }
+    @bottom-left { content: "MAKTECH SiteScore  ·  sitescore.maktechgroup.com"; font: 7.5pt Inter, "Noto Sans Bengali", "DejaVu Sans", sans-serif; color: #6B6B72; }
+    @bottom-right { content: "{{ t.page }} " counter(page{{ ', bengali' if lang == 'bn' else '' }}) " {{ t.of }} " counter(pages{{ ', bengali' if lang == 'bn' else '' }}); font: 7.5pt Inter, "Noto Sans Bengali", "DejaVu Sans", sans-serif; color: #6B6B72; }
   }
   @page :first { margin-top: 16mm; @top-left { content: none; } @top-right { content: none; } }
 
   * { box-sizing: border-box; }
-  body { font-family: Inter, "DejaVu Sans", sans-serif; color: #1D1D1F; font-size: 9.5pt; line-height: 1.45; margin: 0; }
+  body { font-family: Inter, "Noto Sans Bengali", "DejaVu Sans", sans-serif; color: #1D1D1F; font-size: 9.5pt; line-height: 1.45; margin: 0; }
   h1, h2, h3, p { margin: 0; }
   .muted { color: #55555C; }
   .faint { color: #6B6B72; }
@@ -39,14 +43,14 @@
 
   /* ---------------------------------------------------------- the two scores */
   .site { margin-top: 11pt; }
-  .site .host { font-family: "Inter Display", Inter, sans-serif; font-size: 20pt; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-top: 2pt; word-break: break-all; }
+  .site .host { font-family: "Inter Display", Inter, "Noto Sans Bengali", sans-serif; font-size: 20pt; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-top: 2pt; word-break: break-all; }
   .site .meta { margin-top: 3pt; font-size: 8.5pt; }
   .scores { display: flex; gap: 10pt; margin-top: 10pt; }
   .card { flex: 1; border-radius: 12pt; padding: 10pt 12pt; }
   .card.agent { border: 1pt solid #F7C6B1; background: #FFF6F1; }
   .card.health { border: 0.75pt solid #E3E3E8; display: flex; gap: 12pt; align-items: center; }
-  .big { font-family: "Inter Display", Inter, sans-serif; font-size: 34pt; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
-  .big small { font-family: Inter, sans-serif; font-size: 9pt; font-weight: 600; color: #55555C; letter-spacing: 0; }
+  .big { font-family: "Inter Display", Inter, "Noto Sans Bengali", sans-serif; font-size: 34pt; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .big small { font-family: Inter, "Noto Sans Bengali", sans-serif; font-size: 9pt; font-weight: 600; color: #55555C; letter-spacing: 0; }
   .band { display: inline-block; padding: 2.5pt 9pt; border-radius: 20pt; font-size: 9pt; font-weight: 700; }
   .card .band { margin-top: 5pt; }
   .alist { margin-top: 7pt; }
@@ -58,7 +62,7 @@
   .card.health .verdict { font-size: 10.5pt; font-weight: 600; margin-top: 6pt; line-height: 1.35; }
 
   /* ---------------------------------------------------------- category scores */
-  h2.section { font-family: "Inter Display", Inter, sans-serif; font-size: 14pt; font-weight: 700; letter-spacing: -0.01em; margin: 13pt 0 4pt; page-break-after: avoid; }
+  h2.section { font-family: "Inter Display", Inter, "Noto Sans Bengali", sans-serif; font-size: 14pt; font-weight: 700; letter-spacing: -0.01em; margin: 13pt 0 4pt; page-break-after: avoid; }
   table.cats { width: 100%; border-collapse: collapse; }
   table.cats td { padding: 3.5pt 0; border-top: 0.75pt solid #EFEFF4; vertical-align: middle; }
   table.cats tr:first-child td { border-top: none; }
@@ -93,10 +97,10 @@
 
   /* ---------------------------------------------------------- closing */
   .next { margin-top: 22pt; border: 1pt solid #F7C6B1; background: #FFF6F1; border-radius: 14pt; padding: 16pt 18pt; display: flex; gap: 18pt; align-items: center; page-break-inside: avoid; }
-  .next h2 { font-family: "Inter Display", Inter, sans-serif; font-size: 15pt; letter-spacing: -0.01em; }
+  .next h2 { font-family: "Inter Display", Inter, "Noto Sans Bengali", sans-serif; font-size: 15pt; letter-spacing: -0.01em; }
   .next p { color: #3A3A3F; margin-top: 5pt; }
-  .next .price { margin-top: 8pt; font-family: "Inter Display", Inter, sans-serif; font-size: 19pt; font-weight: 700; color: #C03D0B; }
-  .next .price small { font-family: Inter, sans-serif; font-size: 8.5pt; color: #55555C; font-weight: 500; }
+  .next .price { margin-top: 8pt; font-family: "Inter Display", Inter, "Noto Sans Bengali", sans-serif; font-size: 19pt; font-weight: 700; color: #C03D0B; }
+  .next .price small { font-family: Inter, "Noto Sans Bengali", sans-serif; font-size: 8.5pt; color: #55555C; font-weight: 500; }
   .next ul { margin: 8pt 0 0; padding-left: 12pt; color: #3A3A3F; }
   .next li { margin-top: 2pt; }
   .qr { flex: none; text-align: center; font-size: 7.5pt; font-weight: 600; color: #3A3A3F; background: #FFFFFF; border: 0.75pt solid #EFE3DC; border-radius: 10pt; padding: 7pt; }
@@ -109,6 +113,27 @@
   .legend p { font-size: 8.5pt; color: #55555C; margin-top: 3pt; }
   .small { font-size: 8pt; color: #55555C; margin-top: 12pt; word-break: break-all; }
   .every { margin-top: 22pt; page-break-before: auto; }
+  {% if lang == 'bn' %}.eyebrow { letter-spacing: 0; text-transform: none; font-size: 8pt; } body { line-height: 1.55; }{% endif %}
+
+  /* ---------------------------------------------------------- business impact */
+  .impact { display: flex; flex-wrap: wrap; gap: 5pt; margin-top: 2pt; }
+  .impact .tile { width: 49%; display: flex; gap: 7pt; align-items: flex-start; padding: 6pt 8pt; border-radius: 8pt; page-break-inside: avoid; }
+  .impact .tile b { display: block; font-size: 9.5pt; line-height: 1.3; }
+  .impact .tile span { font-size: 8pt; color: #55555C; }
+
+  /* ---------------------------------------------------------- phone view and speed fixes */
+  .phone { display: flex; gap: 14pt; align-items: flex-start; margin-top: 4pt; page-break-inside: avoid; }
+  .phone .shot { flex: none; width: 112pt; text-align: center; font-size: 7.5pt; color: #6B6B72; }
+  .phone .shot img { width: 112pt; border-radius: 10pt; border: 3pt solid #1D1D1F; display: block; margin-bottom: 4pt; }
+  .phone .fixes { flex: 1; }
+  .fix { display: flex; gap: 8pt; padding: 5pt 0; border-top: 0.75pt solid #EFEFF4; }
+  .fix:first-child { border-top: none; }
+  .fix .save { flex: none; font-weight: 700; color: #19753A; font-size: 8.5pt; width: 92pt; text-align: right; }
+
+  /* ---------------------------------------------------------- already good */
+  .good { margin-top: 2pt; }
+  .good div { display: inline-block; width: 49%; vertical-align: top; font-size: 8.5pt; padding: 2pt 0; }
+  .good div .icon { display: inline-block; vertical-align: -1.5pt; margin-right: 5pt; }
 </style>
 </head>
 <body>
@@ -121,29 +146,30 @@
 {%- else %}<path d="M6.2 10h7.6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>{% endif -%}
 </svg></span>
 {%- endmacro %}
-{% macro tag(status) -%}
-<span class="tag" style="background: {{ status_tint[status] }}; color: {{ status_ink[status] }}">{{ status_label[status] }}</span>
+{% macro tag(r) -%}
+{%- set st = sev_status[r.severity] if r.severity else r.status -%}
+<span class="tag" style="background: {{ status_tint[st] }}; color: {{ status_ink[st] }}">{{ sev_label[r.severity] if r.severity else status_label[r.status] }}</span>
 {%- endmacro %}
 
   <!-- ============================================================ page 1: summary -->
   <div>
     <div class="masthead">
-      <div class="brand"><img src="{{ logo }}" alt=""><div><b>SiteScore</b><span>by MAKTECH</span></div></div>
-      <div class="right"><b>AI readiness and health report</b><span class="muted">{{ date }}</span></div>
+      <div class="brand"><img src="{{ logo }}" alt=""><div><b>SiteScore</b><span>{{ t.by }}</span></div></div>
+      <div class="right"><b>{{ t.report_name }}</b><span class="muted">{{ date }}</span></div>
     </div>
 
     <div class="site">
-      <div class="eyebrow">Website</div>
+      <div class="eyebrow">{{ t.website }}</div>
       <div class="host">{{ host }}</div>
-      <div class="meta muted">Scanned {{ scanned }}. {{ check_count }} checks.</div>
+      <div class="meta muted">{{ scanned }}</div>
     </div>
 
     <div class="scores">
       {% if agent_items %}
       <div class="card agent">
-        <div class="eyebrow">AI agent readiness</div>
-        <div class="big" style="margin-top: 4pt; color: {{ agent_ink }}">{{ agent.score if agent.score is not none else '--' }}<small> /100</small></div>
-        <div class="band" style="background: {{ agent_tint }}; color: {{ agent_ink }}">{{ agent.label or 'Not checked' }}</div>
+        <div class="eyebrow">{{ t.agent }}</div>
+        <div class="big" style="margin-top: 4pt; color: {{ agent_ink }}">{{ agent.score | num(lang) if agent.score is not none else '--' }}<small> /{{ 100 | num(lang) }}</small></div>
+        <div class="band" style="background: {{ agent_tint }}; color: {{ agent_ink }}">{{ agent.label or t.not_checked }}</div>
         <div class="alist">
           {% for r in agent_scored %}
           <div class="a">{{ icon(r.status, 9) }}<b>{{ r.name }}</b><span class="r">{{ status_label[r.status] }}</span></div>
@@ -154,57 +180,90 @@
       <div class="card health">
         <div class="ring">{{ ring | safe }}</div>
         <div>
-          <div class="eyebrow" style="color: #55555C">Website health</div>
+          <div class="eyebrow" style="color: #55555C">{{ t.health }}</div>
           {% if band_label %}<div class="band" style="background: {{ band_tint[band] }}; color: {{ band_ink[band] }}">{{ band_label }}</div>{% endif %}
           <div class="verdict">{{ verdict }}</div>
-          {% if coverage is not none and coverage < 100 %}<div class="meta muted" style="margin-top: 4pt; font-size: 8pt">The score covers the {{ coverage }} of 100 points we could check.</div>{% endif %}
-          {% if capped %}<div class="meta" style="margin-top: 4pt; font-size: 8pt; color: #CF0F20; font-weight: 600">Held below 50 because of a serious problem.</div>{% endif %}
+          {% if coverage is not none and coverage < 100 %}<div class="meta muted" style="margin-top: 4pt; font-size: 8pt">{{ t.coverage.format(n=coverage | num(lang)) }}</div>{% endif %}
+          {% if capped %}<div class="meta" style="margin-top: 4pt; font-size: 8pt; color: #CF0F20; font-weight: 600">{{ t.capped }}</div>{% endif %}
         </div>
       </div>
     </div>
 
-    <h2 class="section">Health by area</h2>
+    {% if impact %}
+    <h2 class="section">{{ t.impact }}</h2>
+    <div class="impact">
+      {% for g in impact %}
+      {% set st = {'error': 'fail', 'warning': 'warn', 'good': 'pass'}.get(g.status, 'not_checked') %}
+      <div class="tile" style="background: {{ status_tint[st] }}">{{ icon(st, 12) }}<div><b>{{ g.label }}</b><span>{{ g.count }}</span></div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h2 class="section">{{ t.by_area }}</h2>
     <table class="cats">
       {% for g in groups %}
       {% set s = g.score %}
       <tr>
         <td class="name">{{ g.label }}</td>
         <td class="barcell"><div class="bar"><div style="width: {{ [s or 0, 2] | max }}%; background: {{ g.color }}"></div></div></td>
-        <td class="num" style="color: {{ g.ink }}">{% if s is none %}<small>Not checked</small>{% else %}{{ s }}<small> /100</small>{% endif %}</td>
-        <td class="passed">{{ g.passed }} of {{ g["items"] | length }} passed</td>
+        <td class="num" style="color: {{ g.ink }}">{% if s is none %}<small>{{ t.not_checked }}</small>{% else %}{{ s | num(lang) }}<small> /{{ 100 | num(lang) }}</small>{% endif %}</td>
+        <td class="passed">{{ t.passed_of.format(a=g.passed | num(lang), b=g["items"] | length | num(lang)) }}</td>
       </tr>
       {% endfor %}
     </table>
 
     {% if top %}
-    <h2 class="section">Health: fix these first</h2>
+    <h2 class="section">{{ t.fix_first }}</h2>
     {% for r in top %}
     <div class="prio">
-      <div class="rank">{{ loop.index }}</div>
+      <div class="rank">{{ loop.index | num(lang) }}</div>
       <div>
-        <div class="title">{{ r.title }}{{ tag(r.status) }}</div>
+        <div class="title">{{ r.title }}{{ tag(r) }}</div>
         <div class="sum">{{ r.summary }}</div>
-        {% if r.fix %}<div class="detail"><b>What we do:</b> {{ r.fix }}</div>{% endif %}
+        {% if r.fix %}<div class="detail"><b>{{ t.what_we_do }}</b> {{ r.fix }}</div>{% endif %}
       </div>
     </div>
     {% endfor %}
     {% else %}
-    <h2 class="section">Nothing urgent</h2>
-    <p class="muted">Every check we could run passed. Keep it that way with regular updates, backups and monitoring.</p>
+    <h2 class="section">{{ t.nothing_urgent }}</h2>
+    <p class="muted">{{ t.nothing_urgent_text }}</p>
     {% endif %}
   </div>
 
+  {% if screenshot or speed_fixes %}
+  <h2 class="section">{{ t.phone_view if screenshot else t.speed_fixes }}</h2>
+  <div class="phone">
+    {% if screenshot %}<div class="shot"><img src="{{ screenshot }}" alt="">{{ t.phone_caption }}</div>{% endif %}
+    {% if speed_fixes %}
+    <div class="fixes">
+      {% if screenshot %}<div class="title" style="margin-bottom: 2pt">{{ t.speed_fixes }}</div>{% endif %}
+      <div class="muted" style="font-size: 8.5pt; margin-bottom: 3pt">{{ t.speed_fixes_text }}</div>
+      {% for f in speed_fixes %}
+      <div class="fix"><div style="flex: 1"><b>{{ f.title }}</b><div class="detail" style="margin-top: 1pt">{{ f.detail }}</div></div><div class="save">{{ f.saving }}</div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if good %}
+  <h2 class="section">{{ t.good }}</h2>
+  <div class="good">
+    {% for r in good %}<div>{{ icon('pass', 9) }}<span>{{ r.title }}</span></div>{% endfor %}
+  </div>
+  {% endif %}
+
   <!-- ============================================================ every check -->
   <div class="every">
-  <h2 class="section" style="margin-top: 0">Every check</h2>
-  <p class="muted" style="page-break-after: avoid">What we saw, why it matters and how it gets fixed. Problems come first in each area.</p>
+  <h2 class="section" style="margin-top: 0">{{ t.every }}</h2>
+  <p class="muted" style="page-break-after: avoid">{{ t.every_text }}</p>
   </div>
   {% if agent_items %}
   <div class="group">
     <div class="group-head">
-      <h3>AI agent readiness</h3>
+      <h3>{{ t.agent }}</h3>
       <div class="gbar"><div class="bar"><div style="width: {{ [agent.score or 0, 2] | max }}%; background: {{ agent_color }}"></div></div></div>
-      <div class="gnum" style="color: {{ agent_ink }}">{{ 'Not checked' if agent.score is none else agent.score ~ '/100' }}</div>
+      <div class="gnum" style="color: {{ agent_ink }}">{{ t.not_checked if agent.score is none else (agent.score | num(lang)) ~ '/' ~ (100 | num(lang)) }}</div>
     </div>
     {% for r in agent_items %}
     {% set optional = r.weight == 0 %}
@@ -212,11 +271,11 @@
     <div class="row{{ '' if problem else ' compact' }}">
       {{ icon('not_checked' if optional and r.status != 'pass' else r.status) }}
       <div>
-        <div class="title">{{ r.title }}{% if problem %}{{ tag(r.status) }}{% elif optional %}<span class="tag" style="background: #EFEFF4; color: #55555C">Optional, not scored</span>{% endif %}</div>
+        <div class="title">{{ r.title }}{% if problem %}{{ tag(r) }}{% elif optional %}<span class="tag" style="background: #EFEFF4; color: #55555C">{{ t.optional }}</span>{% endif %}</div>
         <div class="sum">{{ r.summary }}</div>
         {% if problem %}
-        {% if r.why %}<div class="detail"><b>Why it matters:</b> {{ r.why }}</div>{% endif %}
-        {% if r.fix %}<div class="detail"><b>How MAKTECH fixes it:</b> {{ r.fix }}</div>{% endif %}
+        {% if r.why %}<div class="detail"><b>{{ t.why }}</b> {{ r.why }}</div>{% endif %}
+        {% if r.fix %}<div class="detail"><b>{{ t.how }}</b> {{ r.fix }}</div>{% endif %}
         {% endif %}
       </div>
     </div>
@@ -228,18 +287,18 @@
     <div class="group-head">
       <h3>{{ g.label }}</h3>
       <div class="gbar"><div class="bar"><div style="width: {{ [g.score or 0, 2] | max }}%; background: {{ g.color }}"></div></div></div>
-      <div class="gnum" style="color: {{ g.ink }}">{{ 'Not checked' if g.score is none else g.score ~ '/100' }}</div>
+      <div class="gnum" style="color: {{ g.ink }}">{{ t.not_checked if g.score is none else (g.score | num(lang)) ~ '/' ~ (100 | num(lang)) }}</div>
     </div>
     {% for r in g["items"] %}
     {% set problem = r.status in ('fail', 'warn') %}
     <div class="row{{ '' if problem else ' compact' }}">
       {{ icon(r.status) }}
       <div>
-        <div class="title">{{ r.title }}{% if problem %}{{ tag(r.status) }}{% endif %}</div>
+        <div class="title">{{ r.title }}{% if problem %}{{ tag(r) }}{% endif %}</div>
         <div class="sum">{{ r.summary }}</div>
         {% if problem %}
-        {% if r.why %}<div class="detail"><b>Why it matters:</b> {{ r.why }}</div>{% endif %}
-        {% if r.fix %}<div class="detail"><b>How MAKTECH fixes it:</b> {{ r.fix }}</div>{% endif %}
+        {% if r.why %}<div class="detail"><b>{{ t.why }}</b> {{ r.why }}</div>{% endif %}
+        {% if r.fix %}<div class="detail"><b>{{ t.how }}</b> {{ r.fix }}</div>{% endif %}
         {% endif %}
       </div>
     </div>
@@ -250,41 +309,42 @@
   <!-- ============================================================ next steps -->
   <div class="next">
     <div>
-      <div class="eyebrow">Next step</div>
+      <div class="eyebrow">{{ t.next }}</div>
       {% if has_issues %}
-      <h2 style="margin-top: 3pt">Want us to fix these?</h2>
-      <p>With the Fix-It Starter Pack, our engineers make your site ready for AI agents, fix your top 5 health issues, move your site to a MAKTECH server and give you the first month of CloudCare hosting free.</p>
-      <div class="price">{{ price_usd }} <small>one time ({{ price_bdt }})</small></div>
+      <h2 style="margin-top: 3pt">{{ t.want_fix }}</h2>
+      <p>{{ t.offer }}</p>
+      <div class="price">{{ price_usd }} <small>{{ t.one_time }} ({{ price_bdt }})</small></div>
       {% else %}
-      <h2 style="margin-top: 3pt">Keep it this way</h2>
-      <p>CloudCare by MAKTECH monitors your site around the clock, patches it every month and keeps daily off-site backups.</p>
+      <h2 style="margin-top: 3pt">{{ t.keep }}</h2>
+      <p>{{ t.keep_text }}</p>
       {% endif %}
       <ul>
-        <li>Request a call on your results page: {{ link_short }}</li>
-        {% if phone_pretty and phone_pretty == whatsapp_pretty %}<li>Call or WhatsApp us on {{ phone_pretty }}, or scan the code</li>
-        {% else %}{% if phone_pretty %}<li>Call us on {{ phone_pretty }}</li>{% endif %}{% if whatsapp %}<li>WhatsApp us on {{ whatsapp_pretty }}, or scan the code</li>{% endif %}{% endif %}
-        <li>Email {{ contact_email }}</li>
+        <li>{{ t.call_page.format(link=link_short) }}</li>
+        {% if phone_pretty and phone_pretty == whatsapp_pretty %}<li>{{ t.call_wa.format(phone=phone_pretty) }}</li>
+        {% else %}{% if phone_pretty %}<li>{{ t.call.format(phone=phone_pretty) }}</li>{% endif %}{% if whatsapp %}<li>{{ t.wa.format(phone=whatsapp_pretty) }}</li>{% endif %}{% endif %}
+        <li>{{ t.email.format(email=contact_email) }}</li>
       </ul>
     </div>
-    <div class="qr">{{ contact_qr | safe }}{{ 'Chat on WhatsApp' if contact_is_whatsapp else 'Open your results' }}</div>
+    <div class="qr">{{ contact_qr | safe }}{{ t.qr_wa if contact_is_whatsapp else t.qr_results }}</div>
   </div>
 
   <div class="legend">
     <div>
-      <h3>How to read this report</h3>
-      <div class="key">{{ icon('fail', 10) }} Needs fixing: a real risk or a broken setting</div>
-      <div class="key">{{ icon('warn', 10) }} Could be better: worth improving</div>
-      <div class="key">{{ icon('pass', 10) }} Passed</div>
-      <div class="key">{{ icon('not_checked', 10) }} Not checked: left out of the score</div>
+      <h3>{{ t.read }}</h3>
+      <div class="key">{{ icon('fail', 10) }} {{ t.key_error }}</div>
+      <div class="key">{{ icon('warn', 10) }} {{ t.key_warning }}</div>
+      <div class="key">{{ icon('warn', 10) }} {{ t.key_notice }}</div>
+      <div class="key">{{ icon('pass', 10) }} {{ t.key_pass }}</div>
+      <div class="key">{{ icon('not_checked', 10) }} {{ t.key_nc }}</div>
     </div>
     <div>
-      <h3>How the scores work</h3>
-      <p>AI agent readiness: six checks share 100 points, based on open standards that AI assistants and agents use to find and read sites. llms.txt is shown but not scored.</p>
-      <p>Website health: each check is worth a share of 100 points, with more for the checks that matter most. A serious problem, such as an exposed password file, holds the score below 50.</p>
-      <p>SiteScore checks only public information. It is guidance, not a full security audit.</p>
+      <h3>{{ t.scores }}</h3>
+      <p>{{ t.scores_agent }}</p>
+      <p>{{ t.scores_health }}</p>
+      <p>{{ t.scores_public }}</p>
     </div>
   </div>
 
-  <p class="small">Live results: {{ link }}<br>MAKTECH, {{ company_address }}</p>
+  <p class="small">{{ t.live }} {{ link }}<br>MAKTECH, {{ company_address }}</p>
 </body>
 </html>

@@ -23,7 +23,7 @@ from .models import ScanError
 
 log = logging.getLogger("sitescore.engine")
 
-ENGINE_VERSION = "2.0.0"
+ENGINE_VERSION = "2.1.0"
 
 
 @dataclass
@@ -53,6 +53,8 @@ class EngineSettings:
     blocked_networks: tuple[str, ...] = ()
     max_body_bytes: int = 512 * 1024
     skip_speed_test: bool = False
+    # Render script-built homepages in the browser before the content checks read them.
+    render_pages: bool = True
 
 
 @dataclass
@@ -381,6 +383,39 @@ class ScanContext:
             is_html = page.ok and ("html" in ctype or page.text.lstrip()[:15].lower().startswith(("<!doctype", "<html")))
             self.shared["page_info"] = parse_page(page.text) if is_html else None
         return self.shared["page_info"]
+
+    async def content_info(self):
+        """The homepage as visitors and Google see it, for the content checks.
+
+        Usually the HTML as sent. When that is nearly empty and full of scripts (a site built
+        in the browser with React, Vue and the like), the page rendered by the browser is
+        read instead. Returns (PageInfo, rendered) or (None, False).
+        """
+        from .html import parse_page
+
+        if "content_info" in self.shared:
+            return self.shared["content_info"]
+        async with self.shared.setdefault("content_lock", asyncio.Lock()):
+            if "content_info" in self.shared:
+                return self.shared["content_info"]
+            info = await self.page_info()
+            out = (info, False)
+            if info is not None and (info.words < 80 or not info.headings) and info.scripts and self.settings.render_pages:
+                from .speedtest import render_dom
+
+                page = await self.main_page()
+                url = page.final_url or f"https://{self.host}/"
+                insecure = url.startswith("https://") and (await self.fetch(f"https://{self.host}/")).tls_error
+                s = self.settings
+                html = await render_dom(url, chrome_path=s.chrome_path, slots=s.speed_slots, slot_dir=s.speed_slot_dir,
+                                        min_free_mb=s.speed_min_free_mb,
+                                        ignore_cert_errors=insecure or s.speed_ignore_cert_errors)
+                if html:
+                    rendered = parse_page(html)
+                    if rendered.words > info.words:
+                        out = (rendered, True)
+            self.shared["content_info"] = out
+            return out
 
     async def dns_ok(self) -> bool:
         """Sanity check before trusting "record missing" answers.

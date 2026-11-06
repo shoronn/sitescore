@@ -4,6 +4,7 @@ import { AnimatePresence, m, useDragControls } from "motion/react";
 import { useEffect, useRef } from "react";
 import { EASE_OUT } from "../motion";
 import { useMediaQuery } from "./Form";
+import { getLang, translate } from "../i18n";
 
 interface Props {
   open: boolean;
@@ -90,7 +91,7 @@ export default function Sheet({ open, title, onClose, children }: Props) {
                       <Dialog.Close
                         className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                         style={{ background: "var(--field-fill)" }}
-                        aria-label="Close"
+                        aria-label={translate(getLang(), "close")}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
                         <X size={18} strokeWidth={2.4} className="text-2" aria-hidden="true" />

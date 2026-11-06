@@ -3,7 +3,11 @@
 A free, public website check by MAKTECH: **is your website AI agent ready?** A visitor enters their email address (checked for a valid format, a domain that accepts mail and no throwaway inboxes), scans a website, and gets two scores out of 100 with every finding explained in plain language:
 
 - **AI agent readiness** (6 checks, shown first): robots.txt, sitemap, Link headers, Markdown for agents, AI crawler rules and Content Signals, the open standards AI assistants use to find and read sites. llms.txt is shown too, but not scored. The checks follow Cloudflare's agent readiness scanner (isitagentready.com, content-site profile) and were compared with it on real sites.
-- **Website health** (23 checks): security, reliability, email, performance and search basics. The speed test runs on our own worker in a real browser (Lighthouse). If a site turns that browser away (bot protection, a firewall), Google PageSpeed Insights is asked instead, when a key is set.
+- **Website health** (33 checks): security, reliability, email, performance, search and sharing, and content and accessibility. The speed test runs on our own worker in a real browser (Lighthouse). If a site turns that browser away (bot protection, a firewall), Google PageSpeed Insights is asked instead, when a key is set.
+
+Findings are marked as problems, warnings or small improvements, grouped by what they mean for the business ("Your emails may land in spam"), with a "What is already good" list, the top three speed fixes with the time each saves, and a picture of the homepage on a phone.
+
+The web app, the results, the PDF report and the report email work in **English and Bangla** (বাংলা). Visitors switch with the button in the header; the first visit follows the device language, and the report email links back in the language the scan was started in.
 
 Anyone can check any website; the only requirement is a valid email address, where the PDF report goes.
 
@@ -57,7 +61,7 @@ backend/                  Python 3.12
   docker/                 entrypoint (picks api or worker) and health check
   migrations/             Alembic database migrations
   sitescore/
-    engine/               the scanner: 6 AI agent checks and 23 health checks, two scores,
+    engine/               the scanner: 6 AI agent checks and 33 health checks, two scores,
                           plain-language findings, the speed test (speedtest.py, egress.py)
     api.py                public API
     admin.py              sales dashboard API
@@ -345,7 +349,7 @@ Also: run `python -m sitescore set-staff-role you@maktechgroup.com admin` and *C
 
 ### 6.10 SiteScore scoring 100 on itself
 
-The web app serves everything its own AI agent checks look for: `robots.txt` with AI crawler rules and Content Signals, `sitemap.xml`, `llms.txt`, Markdown for agents (`Accept: text/markdown` returns `index.md`), Link headers on the home page, and `/.well-known/security.txt` (the sitemap and security.txt are written fresh on every build). Its speed test scores about 97 (largest content under 2.5 s, almost no blocking time).
+The web app serves everything its own AI agent checks look for: `robots.txt` with AI crawler rules and Content Signals, `sitemap.xml`, `llms.txt`, Markdown for agents (`Accept: text/markdown` returns `index.md`), Link headers on the home page, and `/.well-known/security.txt` (the sitemap and security.txt are written fresh on every build). The home page is pre-rendered into `index.html` at build time (`frontend/src/prerender.tsx`), so its text, main heading, canonical link and business details (schema.org) are there before any script runs; the app's other pages use `app.html`, and unknown addresses get a proper 404. Its speed test scores about 99 and its accessibility 100.
 
 Two things live outside the code, in DNS for maktechgroup.com, and both affect the health score:
 
@@ -412,7 +416,12 @@ The same checks, plus both Docker builds, run in GitHub Actions on every push (`
 
 | What | Where |
 | --- | --- |
-| Wording of every finding | `backend/sitescore/engine/findings.py` |
+| Wording of every finding | `backend/sitescore/engine/findings.py` (English) and `findings_bn.py` (Bangla, same keys and placeholders; a test checks they match) |
+| Business-impact groups and which warnings count as small improvements | `backend/sitescore/engine/impact.py` |
+| Speed fixes and accessibility problems in plain words | `SPEED_FIXES` and `A11Y_ISSUES` in `findings.py`, `SPEED_FIXES_BN` and `A11Y_ISSUES_BN` in `findings_bn.py` |
+| PDF and email phrases | `TEXT` in `backend/sitescore/report.py` (English and Bangla) |
+| API error messages in Bangla | `backend/sitescore/messages_bn.py` |
+| Web app words | `frontend/src/locales/en.ts` and `frontend/src/locales/bn.ts` (the build fails if a Bangla key is missing) |
 | Points per check | the `@check(...)` lines in `backend/sitescore/engine/checks/*.py` |
 | Oldest supported software versions | `backend/sitescore/engine/data/software_versions.json` |
 | Throwaway email domains | `backend/sitescore/data/disposable_domains.txt` |
@@ -427,4 +436,4 @@ The same checks, plus both Docker builds, run in GitHub Actions on every push (`
 | Web app security headers | `frontend/nginx/default.conf.template` |
 | Database tables | edit `backend/sitescore/db.py`, then run `alembic revision --autogenerate -m "what changed"` |
 
-The report font, Inter, is bundled under the SIL Open Font License (`backend/sitescore/assets/fonts/OFL.txt`).
+The report fonts, Inter and Noto Sans Bengali, are bundled under the SIL Open Font License (`backend/sitescore/assets/fonts/OFL.txt`, `NotoSansBengali-OFL.txt`). The web app loads Noto Sans Bengali from the `@fontsource/noto-sans-bengali` package.

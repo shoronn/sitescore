@@ -99,7 +99,7 @@ async def _probe_all(ctx, probes) -> list[tuple[Probe, object]]:
     return list(zip(probes, results))
 
 
-@check("exposed_files", "Exposed files", Category.SECURITY, 7)
+@check("exposed_files", "Exposed files", Category.SECURITY, 6)
 async def check_exposed_files(ctx) -> Outcome:
     if await ctx.site_base() is None:
         return Outcome(Status.NOT_CHECKED, {}, "unreachable")

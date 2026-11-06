@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
+import { translate, useT, type MessageKey } from "../i18n";
 
 const CONTACT = "sitescore@maktechgroup.com";
 const ADDRESS = "8th Floor, A, Majid Tower, Ka-24 Progati Sarani Rd, Dhaka 1229, Bangladesh";
@@ -11,14 +12,16 @@ const PHONE = "+880 1897 669234";
 const PHONE_TEL = "+8801897669234";
 const UPDATED = "31 October 2026";
 
-const PAGES = [
-  { to: "/about", label: "About SiteScore", icon: Info },
-  { to: "/privacy", label: "Privacy", icon: ShieldCheck },
-  { to: "/terms", label: "Terms of use", icon: ScrollText },
+const PAGES: { to: string; label: MessageKey; icon: typeof Info }[] = [
+  { to: "/about", label: "info.about", icon: Info },
+  { to: "/privacy", label: "info.privacy", icon: ShieldCheck },
+  { to: "/terms", label: "info.terms", icon: ScrollText },
 ];
 
-function Page({ title, children }: { title: string; children: React.ReactNode }) {
+/** englishOnly: the legal pages stay in English; Bangla visitors see a note saying so. */
+function Page({ title, children, englishOnly }: { title: string; children: React.ReactNode; englishOnly?: boolean }) {
   const { pathname } = useLocation();
+  const { t, lang } = useT();
   useEffect(() => {
     document.title = `${title} | SiteScore by MAKTECH`;
   }, [title]);
@@ -27,7 +30,7 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
       <Header />
       <main className="shell relative z-10 pt-8 lg:pt-12">
         <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[260px_minmax(0,820px)] xl:justify-center xl:gap-14">
-          <nav aria-label="SiteScore information" className="mb-4 lg:mb-0">
+          <nav aria-label={t("info.nav")} className="mb-4 lg:mb-0">
             <ul className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:sticky lg:top-8 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0">
               {PAGES.map((pg) => {
                 const active = pathname === pg.to;
@@ -40,7 +43,7 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
                       style={active ? { background: "var(--label)", color: "var(--bg)" } : { color: "var(--label-2)" }}
                     >
                       <pg.icon size={17} aria-hidden="true" />
-                      {pg.label}
+                      {t(pg.label)}
                     </Link>
                   </li>
                 );
@@ -51,14 +54,19 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
                   className="glass flex min-h-[44px] items-center gap-2.5 rounded-capsule px-4 text-[15px] font-semibold lg:rounded-2xl lg:border-transparent lg:bg-none lg:shadow-none"
                   style={{ color: "var(--label-2)" }}
                 >
-                  <MailIcon size={17} aria-hidden="true" /> Contact us
+                  <MailIcon size={17} aria-hidden="true" /> {t("info.contact")}
                 </a>
               </li>
             </ul>
           </nav>
           <article className="glass rise-enter rounded-glass px-5 py-7 sm:px-10 sm:py-10">
             <h1 className="balance font-display text-[32px] font-bold leading-tight tracking-tight sm:text-[40px]">{title}</h1>
-            <div className="info-prose mt-5">{children}</div>
+            {englishOnly && lang === "bn" ? (
+              <p className="mt-4 rounded-2xl px-4 py-3 text-[15px] leading-snug" style={{ background: "var(--tint-brand)" }} lang="bn">
+                {t("info.english_only")}
+              </p>
+            ) : null}
+            <div className="info-prose mt-5" lang={englishOnly ? "en" : undefined}>{children}</div>
           </article>
         </div>
       </main>
@@ -69,84 +77,65 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
 
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>;
 
-function WhoWeAre() {
+/** english: on the English-only legal pages this part stays in English too. */
+function WhoWeAre({ english }: { english?: boolean }) {
+  const { t: local } = useT();
+  const t = (key: MessageKey) => (english ? translate("en", key) : local(key));
   return (
     <>
-      <h2>Who we are</h2>
+      <h2>{t("about.who")}</h2>
       <p>
-        SiteScore is run by MAKTECH, <a href={MAP} target="_blank" rel="noreferrer">{ADDRESS}</a>. Email: <Mail />. Phone and
-        WhatsApp: <a href={`tel:${PHONE_TEL}`}>{PHONE}</a>.
+        {t("about.who_text1")} <a href={MAP} target="_blank" rel="noreferrer">{ADDRESS}</a>. {t("about.who_email")} <Mail />.{" "}
+        {t("about.who_phone")} <a href={`tel:${PHONE_TEL}`}>{PHONE}</a>.
       </p>
     </>
   );
 }
 
 export function AboutPage() {
+  const { t } = useT();
   return (
-    <Page title="About SiteScore">
-      <p>
-        SiteScore is a free website check made by MAKTECH, the team that builds and hosts websites and apps for businesses across
-        Bangladesh. It checks whether AI agents and assistants can find and read a site, and the site's security, email setup, speed
-        and reliability, and explains each finding in plain language.
-      </p>
+    <Page title={t("info.about")}>
+      <p>{t("about.intro")}</p>
 
-      <h2>What the scanner does</h2>
+      <h2>{t("about.does")}</h2>
       <ul>
-        <li>Opens your homepage a few times, the way a browser would, and reads the response headers.</li>
-        <li>Checks your SSL certificate, DNS records and email records (SPF, DKIM, DMARC), which are public.</li>
-        <li>
-          Reads your robots.txt, sitemap and Link headers, and asks your homepage for a Markdown version, the way AI agents do. It
-          also looks for llms.txt.
-        </li>
-        <li>
-          Loads your homepage once in a real browser on our own server (Lighthouse, as a mid-range phone on 4G) to measure how fast
-          it loads.
-        </li>
-        <li>Looks up your domain's expiry date and whether your mail server is on a spam blocklist.</li>
-        <li>
-          Checks for a short list of well-known files that should never be public, such as a <code>.git</code> folder, a{" "}
-          <code>.env</code> file or a backup archive. It reads only the first few kilobytes to recognise them and keeps nothing.
-        </li>
-        <li>Reads your homepage's title, description, mobile settings, robots.txt and sitemap, the way Google does.</li>
+        {(["about.does1", "about.does2", "about.does3", "about.does4", "about.does5", "about.does6", "about.does7"] as const).map((k) => (
+          <li key={k}>{t(k)}</li>
+        ))}
       </ul>
 
-      <h2>What it never does</h2>
+      <h2>{t("about.never")}</h2>
       <ul>
-        <li>It never logs in, guesses passwords, fills in forms or tries to break anything.</li>
-        <li>
-          Apart from the speed test, which loads your homepage once like a visitor would, it sends at most about sixty requests per
-          scan, a few at a time, with timeouts on every one.
-        </li>
-        <li>It refuses private and internal network addresses.</li>
+        <li>{t("about.never1")}</li>
+        <li>{t("about.never2")}</li>
+        <li>{t("about.never3")}</li>
       </ul>
 
-      <h2>Saw SiteScore in your server logs?</h2>
+      <h2>{t("about.logs")}</h2>
       <p>
-        Our scanner identifies itself as <code>MAKTECH-SiteScore/1.0 (+https://sitescore.maktechgroup.com/about)</code>. The speed
-        test is a real browser and shows as <code>Chrome-Lighthouse</code>. It runs when someone asks for a check of the site, and
-        only looks at what any visitor or search engine can already see. If you would rather we never scan your site, email{" "}
-        <Mail /> with your domain name and we will block it.
+        {t("about.logs_text1")} <code>MAKTECH-SiteScore/1.0 (+https://sitescore.maktechgroup.com/about)</code>.{" "}
+        {t("about.logs_text2")} <code>Chrome-Lighthouse</code>. {t("about.logs_text3")} <Mail /> {t("about.logs_text4")}
       </p>
 
-      <h2>Want help fixing what it found?</h2>
+      <h2>{t("about.help")}</h2>
       <p>
-        Our engineers can fix the issues for you. Request a call from your results page, call or WhatsApp us on{" "}
-        <a href={`tel:${PHONE_TEL}`}>{PHONE}</a>, or email <Mail />.
+        {t("about.help_text1")} <a href={`tel:${PHONE_TEL}`}>{PHONE}</a>, {t("about.help_text2")} <Mail />.
       </p>
       <WhoWeAre />
-      <p><Link to="/">Check a website</Link></p>
+      <p><Link to="/">{t("about.check")}</Link></p>
     </Page>
   );
 }
 
 export function PrivacyPage() {
   return (
-    <Page title="Privacy">
+    <Page title="Privacy" englishOnly>
       <p className="text-2">Last updated {UPDATED}</p>
       <p>
         This page explains what SiteScore collects, why, and how long we keep it. Questions or requests: <Mail />.
       </p>
-      <WhoWeAre />
+      <WhoWeAre english />
 
       <h2>What we collect</h2>
       <ul>
@@ -195,10 +184,10 @@ export function PrivacyPage() {
 
 export function TermsPage() {
   return (
-    <Page title="Terms of use">
+    <Page title="Terms of use" englishOnly>
       <p className="text-2">Last updated {UPDATED}</p>
       <p>By using SiteScore you agree to these terms. Questions: <Mail />.</p>
-      <WhoWeAre />
+      <WhoWeAre english />
 
       <h2>Which sites you can check</h2>
       <p>

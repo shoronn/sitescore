@@ -1,17 +1,19 @@
 import { Check, Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
 import { m } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
+import { useT } from "../i18n";
 import { useTheme, type ThemePref } from "../theme";
 
-const OPTIONS: { value: ThemePref; label: string; icon: LucideIcon }[] = [
-  { value: "system", label: "Automatic", icon: Monitor },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
+const OPTIONS: { value: ThemePref; label: "theme.system" | "theme.light" | "theme.dark"; icon: LucideIcon }[] = [
+  { value: "system", label: "theme.system", icon: Monitor },
+  { value: "light", label: "theme.light", icon: Sun },
+  { value: "dark", label: "theme.dark", icon: Moon },
 ];
 
 /** Round header button with a small menu: Automatic, Light, Dark. */
 export function ThemeMenu() {
   const { pref, theme, setPref } = useTheme();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -55,7 +57,7 @@ export function ThemeMenu() {
         ref={button}
         type="button"
         className="glass icon-btn"
-        aria-label={`Appearance: ${OPTIONS.find((o) => o.value === pref)?.label}`}
+        aria-label={t("theme.current", { name: t(OPTIONS.find((o) => o.value === pref)?.label ?? "theme.system") })}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -75,7 +77,7 @@ export function ThemeMenu() {
         <div
           id={menuId}
           role="menu"
-          aria-label="Appearance"
+          aria-label={t("theme.label")}
           className="menu-pop glass-float absolute right-0 top-[calc(100%+8px)] z-50 w-48 p-1.5"
           onKeyDown={onMenuKey}
         >
@@ -96,7 +98,7 @@ export function ThemeMenu() {
               }}
             >
               <o.icon size={17} aria-hidden="true" className="text-2" />
-              <span className="flex-1 text-left">{o.label}</span>
+              <span className="flex-1 text-left">{t(o.label)}</span>
               {pref === o.value ? <Check size={17} strokeWidth={2.5} aria-hidden="true" style={{ color: "var(--brand-ink)" }} /> : null}
             </button>
           ))}
@@ -109,6 +111,7 @@ export function ThemeMenu() {
 /** Three-way segmented control with a sliding thumb, used in the footer. */
 export function ThemeSegmented() {
   const { pref, setPref } = useTheme();
+  const { t } = useT();
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     e.preventDefault();
@@ -118,7 +121,7 @@ export function ThemeSegmented() {
     e.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next.value}"]`)?.focus();
   };
   return (
-    <div role="radiogroup" aria-label="Appearance" className="segmented" onKeyDown={onKey}>
+    <div role="radiogroup" aria-label={t("theme.label")} className="segmented" onKeyDown={onKey}>
       {OPTIONS.map((o) => {
         const on = pref === o.value;
         return (
@@ -135,7 +138,7 @@ export function ThemeSegmented() {
             {on ? <m.span layoutId="theme-thumb" className="segmented-thumb absolute inset-0 rounded-capsule" transition={{ type: "spring", stiffness: 500, damping: 38 }} /> : null}
             <span className="relative inline-flex items-center gap-1.5">
               <o.icon size={15} aria-hidden="true" />
-              {o.label}
+              {t(o.label)}
             </span>
           </button>
         );

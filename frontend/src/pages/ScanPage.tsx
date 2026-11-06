@@ -1,9 +1,9 @@
-import { AlertTriangle, Check, ChevronDown, Download, Link2Off, Loader2, MailCheck, MessageCircle, Minus, Phone, PhoneCall, RotateCcw, SearchX, Share2 } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, Download, Gauge, Globe2, Link2Off, Loader2, Mail, MailCheck, MessageCircle, Minus, Phone, PhoneCall, RotateCcw, SearchX, Share2, ShieldCheck, Smartphone, Users, Zap, type LucideIcon } from "lucide-react";
 import { AnimatePresence, m } from "motion/react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, ApiError, type CheckResult, type PublicConfig, type Scan, type Status } from "../api";
-import { AGENT_AREA, AGENT_CHECKS, ALL_CHECK_KEYS, CATEGORIES, CHECKS } from "../checks";
+import { api, ApiError, type CheckResult, type ImpactGroup, type PublicConfig, type Scan, type Status } from "../api";
+import { AGENT_AREA, AGENT_CHECKS, ALL_CHECK_KEYS, areaName, CATEGORIES, CHECKS, checkName, SLOW_KEYS } from "../checks";
 import { DEFAULT_PRICES, formatPrice, useCurrency, type Currency } from "../currency";
 import AgentReadiness from "../components/AgentReadiness";
 import Footer from "../components/Footer";
@@ -11,6 +11,7 @@ import { ErrorText } from "../components/Form";
 import Header from "../components/Header";
 import ScoreRing from "../components/ScoreRing";
 import StatusIcon from "../components/StatusIcon";
+import { useT } from "../i18n";
 import { EASE_OUT, Reveal } from "../motion";
 
 const POLL_MS = 1200;
@@ -21,6 +22,7 @@ export default function ScanPage() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [config, setConfig] = useState<PublicConfig | null>(null);
+  const { t, lang } = useT();
 
   useEffect(() => {
     api.config().then(setConfig).catch(() => undefined);
@@ -32,7 +34,7 @@ export default function ScanPage() {
     const startedAt = Date.now();
     const tick = async () => {
       try {
-        const s = await api.scan(token);
+        const s = await api.scan(token, lang);
         if (stop) return;
         setScan(s);
         if (s.status === "queued" || s.status === "running") timer = setTimeout(tick, POLL_MS);
@@ -51,7 +53,7 @@ export default function ScanPage() {
       stop = true;
       clearTimeout(timer);
     };
-  }, [token]);
+  }, [token, lang]);
 
   if (error) {
     const expired = error.status === 410;
@@ -59,9 +61,9 @@ export default function ScanPage() {
       <Shell>
         <Notice
           icon={expired ? Link2Off : SearchX}
-          title={expired ? "This link has expired" : "Scan not found"}
-          body={expired ? error.message : "This results link doesn't match any scan. Check that it was copied in full, or run a new scan."}
-          action={<Link to="/" className="btn-primary mt-6 w-full">Scan a website</Link>}
+          title={expired ? t("scan.expired") : t("scan.not_found")}
+          body={expired ? error.message : t("scan.not_found_text")}
+          action={<Link to="/" className="btn-primary mt-6 w-full">{t("scan.scan_a_site")}</Link>}
         />
       </Shell>
     );
@@ -71,7 +73,7 @@ export default function ScanPage() {
       <Shell>
         <div className="mt-24 flex flex-col items-center gap-3" role="status">
           <Loader2 className="spin text-3" size={30} aria-hidden="true" />
-          <span className="text-2 text-[15px]">Loading results</span>
+          <span className="text-2 text-[15px]">{t("scan.loading")}</span>
         </div>
       </Shell>
     );
@@ -107,13 +109,14 @@ function Notice({ icon: Icon, title, body, action, tone = "neutral" }: { icon: t
 }
 
 function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null }) {
+  const { t } = useT();
   useEffect(() => {
-    const agentPart = scan.agent.score !== null ? `AI agent ready ${scan.agent.score}/100, ` : "";
+    const agentPart = scan.agent.score !== null ? t("scan.title_agent", { score: scan.agent.score }) : "";
     document.title =
       scan.status === "done"
-        ? `${scan.host}: ${agentPart}health ${scan.score ?? "--"}/100 | SiteScore`
-        : `Checking ${scan.host} | SiteScore`;
-  }, [scan.status, scan.score, scan.agent.score, scan.host]);
+        ? t("scan.title_done", { host: scan.host, agent: agentPart, score: scan.score ?? "--" })
+        : t("scan.title_running", { host: scan.host });
+  }, [scan.status, scan.score, scan.agent.score, scan.host, t]);
   const running = scan.status === "queued" || scan.status === "running";
   const done = scan.status === "done";
   const byKey = useMemo(() => Object.fromEntries(scan.results.map((r) => [r.key, r])), [scan.results]);
@@ -128,8 +131,10 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
   const health = scan.results.filter((r) => HEALTH_KEYS.has(r.key));
   // Scans from before AI agent readiness existed have no agent results: leave that part out.
   const hasAgent = scan.results.some((r) => r.category === "agent");
+  // Small improvements (notices) are listed with their area, not among the problems to fix first.
   const fails = health.filter((r) => r.status === "fail");
-  const warns = health.filter((r) => r.status === "warn");
+  const warns = health.filter((r) => r.status === "warn" && r.severity !== "notice");
+  const notices = health.filter((r) => r.severity === "notice");
   const topIssues = [...fails, ...warns]
     .sort((a, b) => Number(b.critical) - Number(a.critical) || STATUS_RANK[a.status] - STATUS_RANK[b.status] || b.weight - a.weight)
     .slice(0, 5);
@@ -140,9 +145,9 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
         <Notice
           icon={AlertTriangle}
           tone="fail"
-          title={`We couldn't scan ${scan.host}`}
+          title={t("scan.failed", { host: scan.host })}
           body={scan.error?.message}
-          action={<Link to="/" className="btn-primary mt-6 w-full">Try another address</Link>}
+          action={<Link to="/" className="btn-primary mt-6 w-full">{t("scan.try_another")}</Link>}
         />
       </Shell>
     );
@@ -153,7 +158,7 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
       {/* The site, with the actions on wide screens */}
       <div className="flex flex-col items-center gap-4 pt-6 text-center lg:flex-row lg:items-end lg:justify-between lg:pt-10 lg:text-left">
         <div className="min-w-0">
-          <p className="text-2 text-[15px] font-medium">{running ? "Checking" : "Results for"}</p>
+          <p className="text-2 text-[15px] font-medium">{running ? t("scan.checking") : t("scan.results_for")}</p>
           <h1 className="mt-0.5 break-all font-display text-[26px] font-bold leading-tight tracking-tight lg:text-[34px]">{scan.host}</h1>
         </div>
         {done ? (
@@ -169,11 +174,13 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
         </div>
       ) : null}
 
+      {done && scan.impact?.length ? <ImpactSummary groups={scan.impact} /> : null}
+
       <div className="mt-7 grid gap-7 lg:mt-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)] xl:gap-14">
         {/* Left: the health ring and the call to action */}
         <div className="lg:sticky lg:top-6 lg:self-start">
           {done ? (
-            <h2 className="text-2 text-center text-[13px] font-semibold uppercase tracking-[0.06em]">Website health</h2>
+            <h2 className="text-2 text-center text-[13px] font-semibold uppercase tracking-[0.06em]">{t("scan.health")}</h2>
           ) : null}
           <div className={done ? "mt-4" : ""}>
             <ScoreRing
@@ -185,7 +192,7 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
             />
           </div>
           {done ? (
-            <Verdict scan={scan} fails={fails.length} warns={warns.length} />
+            <Verdict scan={scan} fails={fails.length} warns={warns.length} notices={notices.length} />
           ) : (
             <PhaseLine scan={scan} />
           )}
@@ -202,7 +209,7 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
 
           {done && topIssues.length ? (
             <section aria-labelledby="fix-first" className="rise-enter">
-              <SectionTitle id="fix-first">Health: fix these first</SectionTitle>
+              <SectionTitle id="fix-first">{t("scan.fix_first")}</SectionTitle>
               <ul className="glass mt-3 overflow-hidden rounded-glass">
                 {topIssues.map((r, i) => (
                   <ResultRow key={r.key} result={r} first={i === 0} />
@@ -217,25 +224,29 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
             </div>
           ) : null}
 
+          {done && (scan.screenshot || scan.speed_fixes?.length) ? <PhoneView scan={scan} /> : null}
+
           {done ? (
             <Reveal>
               <CategoryTiles scan={scan} />
             </Reveal>
           ) : null}
 
+          {done ? <GoodList results={scan.results} /> : null}
+
           {done ? (
           <section aria-labelledby="all-checks" className="rise-enter">
-            <SectionTitle id="all-checks">Every check</SectionTitle>
+            <SectionTitle id="all-checks">{t("scan.every")}</SectionTitle>
             {/* Two flowing columns on wide screens, so the long Security list does not leave gaps. */}
             <div className="mt-3 gap-5 xl:columns-2">
               {hasAgent ? (
               <div className="mb-5 break-inside-avoid">
                 <h3 className="text-2 mb-2 flex items-center gap-1.5 px-1 text-[13px] font-semibold uppercase tracking-[0.06em]">
-                  <AGENT_AREA.icon size={14} aria-hidden="true" /> {AGENT_AREA.label}
+                  <AGENT_AREA.icon size={14} aria-hidden="true" /> {t("area.agent")}
                 </h3>
                 <ul className="glass overflow-hidden rounded-glass">
                   {AGENT_CHECKS.map((ch, i) => (
-                    <ResultRow key={ch.key} result={byKey[ch.key]} pendingName={ch.name} first={i === 0} optional={ch.optional} />
+                    <ResultRow key={ch.key} result={byKey[ch.key]} pendingName={t(checkName(ch.key))} first={i === 0} optional={ch.optional} />
                   ))}
                 </ul>
               </div>
@@ -243,11 +254,11 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
               {CATEGORIES.map((c) => (
                 <div key={c.key} className="mb-5 break-inside-avoid">
                   <h3 className="text-2 mb-2 flex items-center gap-1.5 px-1 text-[13px] font-semibold uppercase tracking-[0.06em]">
-                    <c.icon size={14} aria-hidden="true" /> {c.label}
+                    <c.icon size={14} aria-hidden="true" /> {t(areaName(c.key))}
                   </h3>
                   <ul className="glass overflow-hidden rounded-glass">
                     {CHECKS.filter((ch) => ch.category === c.key).map((ch, i) => (
-                      <ResultRow key={ch.key} result={byKey[ch.key]} pendingName={ch.name} first={i === 0} />
+                      <ResultRow key={ch.key} result={byKey[ch.key]} pendingName={t(checkName(ch.key))} first={i === 0} />
                     ))}
                   </ul>
                 </div>
@@ -268,20 +279,20 @@ function ScanView({ scan, config }: { scan: Scan; config: PublicConfig | null })
 }
 
 function ResultActions({ scan }: { scan: Scan }) {
+  const { t, lang } = useT();
   return (
     <>
-      <a href={api.reportUrl(scan.token)} className="btn-glass" download>
-        <Download size={18} aria-hidden="true" /> Download PDF
+      <a href={api.reportUrl(scan.token, lang)} className="btn-glass" download>
+        <Download size={18} aria-hidden="true" /> {t("scan.download")}
       </a>
       <ShareButton host={scan.host} />
       <Link to="/" className="btn-glass">
-        <RotateCcw size={18} aria-hidden="true" /> Scan another site
+        <RotateCcw size={18} aria-hidden="true" /> {t("scan.another")}
       </Link>
     </>
   );
 }
 
-const SPEED_KEYS = new Set(CHECKS.filter((c) => c.category === "performance").map((c) => c.key));
 const HEALTH_KEYS = new Set(CHECKS.map((c) => c.key));
 
 /** Checks that count as finished for the progress display. */
@@ -291,15 +302,11 @@ function settledKeys(scan: Scan): Set<string> {
 
 /** One plain sentence about what is happening now, read out to screen readers as it changes. */
 function PhaseLine({ scan }: { scan: Scan }) {
+  const { t } = useT();
   const doneKeys = settledKeys(scan);
   const left = ALL_CHECK_KEYS.filter((k) => !doneKeys.has(k));
-  const onlySpeed = left.length > 0 && left.every((k) => SPEED_KEYS.has(k));
-  const text =
-    scan.status === "queued"
-      ? "Starting your scan..."
-      : onlySpeed
-        ? "Almost done. We're loading your site in a real phone browser to test its speed, which can take a minute or two."
-        : "Checking your site. Your results appear here as soon as every check is done.";
+  const onlySpeed = left.length > 0 && left.every((k) => SLOW_KEYS.has(k));
+  const text = scan.status === "queued" ? t("scan.starting") : onlySpeed ? t("scan.almost") : t("scan.working");
   return (
     <p className="text-2 mx-auto mt-5 max-w-[32ch] text-center text-[15px] leading-snug" aria-live="polite">
       {text}
@@ -308,6 +315,7 @@ function PhaseLine({ scan }: { scan: Scan }) {
 }
 
 function useElapsed(since: string): string {
+  const { n } = useT();
   const start = useMemo(() => Math.min(Date.parse(since) || Date.now(), Date.now()), [since]);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -315,7 +323,7 @@ function useElapsed(since: string): string {
     return () => clearInterval(t);
   }, []);
   const secs = Math.max(0, Math.floor((now - start) / 1000));
-  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  return n(`${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`);
 }
 
 /** Shown while the scan runs: overall progress and where each area is up to. No findings yet. */
@@ -326,19 +334,20 @@ function ScanProgress({ scan }: { scan: Scan }) {
   const pct = Math.round((finished / total) * 100);
   const elapsed = useElapsed(scan.created_at);
   const queued = scan.status === "queued";
+  const { t } = useT();
   return (
     <section className="glass rise-enter rounded-glass p-5 sm:p-6" aria-labelledby="progress-title">
       <div className="flex items-baseline justify-between gap-4">
         <h2 id="progress-title" className="font-display text-[20px] font-bold tracking-tight">
-          {queued ? "Getting ready" : "Scanning"}
+          {queued ? t("scan.getting_ready") : t("scan.scanning")}
         </h2>
-        <span className="text-2 tabular text-[14px] font-medium" aria-label={`Time so far ${elapsed}`}>{elapsed}</span>
+        <span className="text-2 tabular text-[14px] font-medium" aria-label={t("scan.time_so_far", { time: elapsed })}>{elapsed}</span>
       </div>
       <div
         className="mt-3 h-2 overflow-hidden rounded-full"
         style={{ background: "var(--track)" }}
         role="progressbar"
-        aria-label="Scan progress"
+        aria-label={t("scan.progress")}
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -351,10 +360,10 @@ function ScanProgress({ scan }: { scan: Scan }) {
           transition={{ duration: 0.6, ease: EASE_OUT }}
         />
       </div>
-      <p className="text-2 tabular mt-2 text-[14px]">{finished} of {total} checks done</p>
+      <p className="text-2 tabular mt-2 text-[14px]">{t("scan.progress_n", { done: finished, total })}</p>
 
       <ul className="mt-4 space-y-1">
-        {[{ key: "agent", label: AGENT_AREA.label, icon: AGENT_AREA.icon }, ...CATEGORIES].map((c) => {
+        {[{ key: "agent", icon: AGENT_AREA.icon }, ...CATEGORIES].map((c) => {
           const checks = c.key === "agent" ? AGENT_CHECKS : CHECKS.filter((ch) => ch.category === c.key);
           const n = checks.filter((ch) => doneKeys.has(ch.key)).length;
           const state = queued ? "waiting" : n === checks.length ? "done" : "running";
@@ -368,15 +377,15 @@ function ScanProgress({ scan }: { scan: Scan }) {
                 <c.icon size={19} className={state === "done" ? "ink-pass" : "ink-brand"} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[16px] font-semibold leading-tight">{c.label}</span>
+                <span className="block text-[16px] font-semibold leading-tight">{t(areaName(c.key))}</span>
                 <span className="text-2 block text-[14px] leading-snug">
                   {state === "done"
-                    ? "Done"
+                    ? t("scan.area_done")
                     : state === "waiting"
-                      ? "Waiting to start"
+                      ? t("scan.area_waiting")
                       : speed
-                        ? "Speed test in a real phone browser, can take a minute or two"
-                        : `${n} of ${checks.length} checked`}
+                        ? t("scan.area_speed")
+                        : t("scan.area_n", { done: n, total: checks.length })}
                 </span>
               </span>
               <span className="flex h-7 w-7 shrink-0 items-center justify-center" aria-hidden="true">
@@ -395,7 +404,7 @@ function ScanProgress({ scan }: { scan: Scan }) {
         })}
       </ul>
       <p className="text-3 mt-3 text-[13px] leading-snug">
-        You can keep this page open. Scans usually take a minute or two, and we email the PDF report when it is done.
+        {t("scan.keep_open")}
       </p>
     </section>
   );
@@ -409,23 +418,28 @@ function SectionTitle({ id, children }: { id: string; children: React.ReactNode 
   );
 }
 
-function Verdict({ scan, fails, warns }: { scan: Scan; fails: number; warns: number }) {
+function Verdict({ scan, fails, warns, notices }: { scan: Scan; fails: number; warns: number; notices: number }) {
+  const { t } = useT();
   const parts: string[] = [];
-  if (fails) parts.push(`${fails} ${fails === 1 ? "problem needs" : "problems need"} fixing`);
-  if (warns) parts.push(`${warns} ${warns === 1 ? "thing" : "things"} could be better`);
-  const sentence = parts.length ? `${parts.join(" and ")}.` : "Everything we checked looks good.";
+  if (fails) parts.push(t(fails === 1 ? "scan.verdict_fail_1" : "scan.verdict_fail_n", { n: fails }));
+  if (warns) parts.push(t(warns === 1 ? "scan.verdict_warn_1" : "scan.verdict_warn_n", { n: warns }));
+  const sentence = parts.length ? parts.join(t("scan.verdict_and")) + t("scan.verdict_end") : t("scan.verdict_ok");
   return (
     <div className="mx-auto mt-5 max-w-[34ch] text-center">
       <p className="balance text-[17px] font-semibold leading-snug">{sentence}</p>
-      {scan.capped ? <p className="text-2 mt-1.5 text-[14px] leading-snug">Score held below 50 because of a serious problem.</p> : null}
+      {notices ? (
+        <p className="text-2 mt-1 text-[14px] leading-snug">{t(notices === 1 ? "scan.verdict_notes_1" : "scan.verdict_notes_n", { n: notices })}</p>
+      ) : null}
+      {scan.capped ? <p className="text-2 mt-1.5 text-[14px] leading-snug">{t("scan.capped")}</p> : null}
       {scan.coverage !== null && scan.coverage < 70 ? (
-        <p className="text-2 mt-1.5 text-[14px] leading-snug">We could check {scan.coverage} of 100 points. The score covers only those.</p>
+        <p className="text-2 mt-1.5 text-[14px] leading-snug">{t("scan.coverage", { n: scan.coverage })}</p>
       ) : null}
     </div>
   );
 }
 
 function ResultRow({ result, pendingName, first, optional }: { result?: CheckResult; pendingName?: string; first?: boolean; optional?: boolean }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const border = first ? "" : "border-t hairline";
   if (!result) {
@@ -448,14 +462,21 @@ function ResultRow({ result, pendingName, first, optional }: { result?: CheckRes
         transition={{ type: "spring", stiffness: 520, damping: 26 }}
       >
         {/* Optional checks never show red: they are information, not a problem. */}
-        <StatusIcon status={optional && result.status !== "pass" ? "not_checked" : result.status} />
+        <StatusIcon
+          status={optional && result.status !== "pass" ? "not_checked" : result.status}
+          label={result.severity === "notice" && !optional ? t("sev.notice") : undefined}
+        />
       </m.span>
       <span className="min-w-0 flex-1">
         <span className="block text-[16px] font-semibold leading-snug">
           {result.title}
           {optional ? (
             <span className="text-2 ml-2 inline-block rounded-capsule px-2 py-0.5 align-[2px] text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ background: "var(--field-fill)" }}>
-              Not scored
+              {t("scan.not_scored")}
+            </span>
+          ) : result.severity === "notice" ? (
+            <span className="text-2 ml-2 inline-block rounded-capsule px-2 py-0.5 align-[2px] text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ background: "var(--field-fill)" }}>
+              {t("sev.notice")}
             </span>
           ) : null}
         </span>
@@ -499,13 +520,13 @@ function ResultRow({ result, pendingName, first, optional }: { result?: CheckRes
         <div className="space-y-3 px-4 pb-4 pl-[54px] text-[15px] leading-snug">
           {result.why ? (
             <div>
-              <p className="text-3 text-[12px] font-semibold uppercase tracking-[0.06em]">Why it matters</p>
+              <p className="text-3 text-[12px] font-semibold uppercase tracking-[0.06em]">{t("scan.why")}</p>
               <p className="text-2 mt-1">{result.why}</p>
             </div>
           ) : null}
           {result.fix && result.status !== "pass" ? (
             <div>
-              <p className="text-3 text-[12px] font-semibold uppercase tracking-[0.06em]">How MAKTECH fixes it</p>
+              <p className="text-3 text-[12px] font-semibold uppercase tracking-[0.06em]">{t("scan.how")}</p>
               <p className="text-2 mt-1">{result.fix}</p>
             </div>
           ) : null}
@@ -518,12 +539,14 @@ function ResultRow({ result, pendingName, first, optional }: { result?: CheckRes
 }
 
 function CategoryTiles({ scan }: { scan: Scan }) {
+  const { t, n } = useT();
   return (
     <section aria-labelledby="by-category">
-      <SectionTitle id="by-category">Health by area</SectionTitle>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
+      <SectionTitle id="by-category">{t("scan.by_area")}</SectionTitle>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {CATEGORIES.map((c) => {
           const cat = scan.categories.find((x) => x.key === c.key);
+          const label = t(areaName(c.key));
           const score = cat?.score ?? null;
           const tone = score === null ? null : score >= 80 ? "pass" : score >= 50 ? "warn" : "fail";
           return (
@@ -532,19 +555,19 @@ function CategoryTiles({ scan }: { scan: Scan }) {
                 <span className="flex h-7 w-7 items-center justify-center rounded-[9px]" style={{ background: "var(--tint-brand)" }}>
                   <c.icon size={16} className="ink-brand" aria-hidden="true" />
                 </span>
-                <span className="text-[15px] font-semibold">{c.label}</span>
+                <span className="text-[15px] font-semibold leading-tight">{label}</span>
               </div>
               {tone ? (
                 <>
                   <div className="tabular mt-3 font-display text-[32px] font-bold leading-none tracking-tight" style={{ color: `var(--${tone}-ink)` }}>
-                    {score}
-                    <span className="text-3 ml-0.5 text-[15px] font-semibold tracking-normal">/100</span>
+                    {n(score ?? 0)}
+                    <span className="text-3 ml-0.5 text-[15px] font-semibold tracking-normal">{t("per_100")}</span>
                   </div>
                   <div
                     className="mt-3 h-1.5 overflow-hidden rounded-full"
                     style={{ background: "var(--track)" }}
                     role="progressbar"
-                    aria-label={`${c.label} score`}
+                    aria-label={t("scan.area_score", { area: label })}
                     aria-valuenow={score ?? 0}
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -562,7 +585,7 @@ function CategoryTiles({ scan }: { scan: Scan }) {
               ) : (
                 <>
                   <div className="text-3 mt-3 flex h-8 items-center gap-1.5 text-[15px] font-semibold">
-                    <Minus size={16} aria-hidden="true" /> Not checked
+                    <Minus size={16} aria-hidden="true" /> {t("status.not_checked")}
                   </div>
                   <div className="mt-3 h-1.5 rounded-full" style={{ background: "var(--track)" }} aria-hidden="true" />
                 </>
@@ -576,6 +599,7 @@ function CategoryTiles({ scan }: { scan: Scan }) {
 }
 
 function OfferCard({ scan, issues, config }: { scan: Scan; issues: number; config: PublicConfig | null }) {
+  const { t, n } = useT();
   const [requested, setRequested] = useState(scan.callback_requested);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -583,7 +607,7 @@ function OfferCard({ scan, issues, config }: { scan: Scan; issues: number; confi
   const phone = config?.contact_phone ?? null;
   const wa = config?.whatsapp_number
     ? `https://wa.me/${config.whatsapp_number}?text=${encodeURIComponent(
-        `Hi MAKTECH, I checked ${scan.host} on SiteScore (AI agent readiness ${scan.agent.score ?? "--"}/100, health ${scan.score ?? "--"}/100) and would like help fixing it. ${link}`,
+        t("scan.wa_text", { host: scan.host, agent: String(scan.agent.score ?? "--"), score: String(scan.score ?? "--"), link }),
       )}`
     : null;
 
@@ -610,16 +634,16 @@ function OfferCard({ scan, issues, config }: { scan: Scan; issues: number; confi
         aria-hidden="true"
       />
       <h2 id="offer-title" className="relative font-display text-[21px] font-bold leading-snug tracking-tight">
-        {healthy ? "Keep it this way" : "Want us to fix these?"}
+        {healthy ? t("scan.offer_keep") : t("scan.offer_fix")}
       </h2>
       {healthy ? (
         <p className="text-2 relative mt-1.5 text-[15px] leading-snug">
-          CloudCare by MAKTECH monitors your site around the clock, patches it every month and keeps daily off-site backups.
+          {t("scan.offer_keep_text")}
         </p>
       ) : (
         <>
           <p className="text-2 relative mt-1.5 text-[15px] leading-snug">
-            With the Fix-It Starter Pack, our engineers make your site ready for AI agents, fix your top 5 health issues, move your site to a MAKTECH server and give you the first month of CloudCare hosting free.
+            {t("scan.offer_fix_text")}
           </p>
           <Price config={config} />
         </>
@@ -628,30 +652,30 @@ function OfferCard({ scan, issues, config }: { scan: Scan; issues: number; confi
         {scan.is_owner ? (
           requested ? (
             <p className="flex items-center gap-2.5 rounded-2xl px-4 py-3 text-[15px] font-semibold" style={{ background: "var(--tint-pass)" }} role="status">
-              <Check size={18} strokeWidth={2.6} className="ink-pass shrink-0" aria-hidden="true" /> Thanks. Our team will call you soon.
+              <Check size={18} strokeWidth={2.6} className="ink-pass shrink-0" aria-hidden="true" /> {t("scan.thanks")}
             </p>
           ) : (
             <button className="btn-primary w-full" onClick={callMe} disabled={busy} aria-busy={busy || undefined}>
               {busy ? <Loader2 size={20} className="spin" aria-hidden="true" /> : <Phone size={18} aria-hidden="true" />}
-              Request a call
+              {t("scan.request_call")}
             </button>
           )
         ) : null}
         {phone || wa ? (
           <div className={`grid gap-2.5 ${phone && wa ? "grid-cols-2" : ""}`}>
             {phone ? (
-              <a href={`tel:+${phone}`} className="btn-glass w-full px-3" aria-label={`Call MAKTECH on ${prettyPhone(phone)}`}>
-                <PhoneCall size={18} className="ink-brand" aria-hidden="true" /> Call us
+              <a href={`tel:+${phone}`} className="btn-glass w-full px-3" aria-label={t("scan.call_label", { phone: prettyPhone(phone) })}>
+                <PhoneCall size={18} className="ink-brand" aria-hidden="true" /> {t("scan.call_us")}
               </a>
             ) : null}
             {wa ? (
               <a href={wa} target="_blank" rel="noreferrer" className="btn-glass w-full px-3">
-                <MessageCircle size={18} className="ink-pass" aria-hidden="true" /> WhatsApp
+                <MessageCircle size={18} className="ink-pass" aria-hidden="true" /> {t("scan.whatsapp")}
               </a>
             ) : null}
           </div>
         ) : null}
-        {phone ? <p className="text-2 tabular text-center text-[13px] font-medium">{prettyPhone(phone)}</p> : null}
+        {phone ? <p className="text-2 tabular text-center text-[13px] font-medium">{n(prettyPhone(phone))}</p> : null}
         {err ? <ErrorText>{err}</ErrorText> : null}
       </div>
       {scan.owner_email ? <ReportNote scan={scan} /> : null}
@@ -668,6 +692,7 @@ function prettyPhone(digits: string): string {
 /** The offer price, with a USD / BDT switch. The choice is remembered on this device. */
 function Price({ config }: { config: PublicConfig | null }) {
   const [currency, setCurrency] = useCurrency();
+  const { t, n, lang } = useT();
   const prices = config?.prices ?? DEFAULT_PRICES;
   const id = useId();
   const options: { value: Currency; label: string }[] = [
@@ -685,11 +710,11 @@ function Price({ config }: { config: PublicConfig | null }) {
     <div className="relative mt-4 flex items-center justify-between gap-3">
       <p className="min-w-0" aria-live="polite">
         <span className="ink-brand tabular block whitespace-nowrap font-display text-[30px] font-bold leading-none tracking-tight">
-          {formatPrice(prices[currency], currency)}
+          {currency === "bdt" && lang === "bn" ? n(formatPrice(prices[currency], currency).replace("Tk ", "৳")) : formatPrice(prices[currency], currency)}
         </span>
-        <span className="text-2 mt-1 block text-[13px] font-medium">one time</span>
+        <span className="text-2 mt-1 block text-[13px] font-medium">{t("scan.one_time")}</span>
       </p>
-      <div role="radiogroup" aria-label="Currency" className="segmented shrink-0" onKeyDown={onKey}>
+      <div role="radiogroup" aria-label={t("scan.currency")} className="segmented shrink-0" onKeyDown={onKey}>
         {options.map((o) => {
           const on = currency === o.value;
           return (
@@ -715,6 +740,7 @@ function Price({ config }: { config: PublicConfig | null }) {
 
 /** Where the PDF report is: being sent, sent, or delayed (with the download as a fallback). */
 function ReportNote({ scan }: { scan: Scan }) {
+  const { t } = useT();
   const st = scan.report_status;
   const Icon = st === "sent" ? MailCheck : st === "failed" ? AlertTriangle : Loader2;
   const email = <span className="font-semibold [overflow-wrap:anywhere]" style={{ color: "var(--label)" }}>{scan.owner_email}</span>;
@@ -726,13 +752,7 @@ function ReportNote({ scan }: { scan: Scan }) {
         aria-hidden="true"
       />
       <span>
-        {st === "sent" ? (
-          <>We've emailed the full PDF report to {email}.</>
-        ) : st === "failed" ? (
-          <>We're having trouble emailing your report to {email}. We'll keep trying, and you can download it below.</>
-        ) : (
-          <>Sending the full PDF report to {email}...</>
-        )}
+        <WithEmail text={t(st === "sent" ? "scan.report_sent" : st === "failed" ? "scan.report_failed" : "scan.report_sending")} email={email} />
       </span>
     </p>
   );
@@ -740,11 +760,12 @@ function ReportNote({ scan }: { scan: Scan }) {
 
 function ShareButton({ host }: { host: string }) {
   const [copied, setCopied] = useState(false);
+  const { t } = useT();
   const share = async () => {
     const url = window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: `SiteScore for ${host}`, url });
+        await navigator.share({ title: t("scan.share_title", { host }), url });
         return;
       } catch (e) {
         if ((e as DOMException)?.name === "AbortError") return; // the visitor closed the share sheet
@@ -755,13 +776,148 @@ function ShareButton({ host }: { host: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.prompt("Copy this link:", url);
+      window.prompt(t("scan.copy_prompt"), url);
     }
   };
   return (
     <button className="btn-glass" onClick={share}>
       {copied ? <Check size={18} className="ink-pass" aria-hidden="true" /> : <Share2 size={18} aria-hidden="true" />}
-      <span aria-live="polite">{copied ? "Link copied" : "Share results"}</span>
+      <span aria-live="polite">{copied ? t("scan.copied") : t("scan.share")}</span>
     </button>
+  );
+}
+
+/** Puts the highlighted address where {email} sits in a translated sentence. */
+function WithEmail({ text, email }: { text: string; email: React.ReactNode }) {
+  const [before, after = ""] = text.split("{email}");
+  return (
+    <>
+      {before}
+      {email}
+      {after}
+    </>
+  );
+}
+
+const IMPACT_ICON: Record<string, LucideIcon> = {
+  ai: Bot,
+  google: Globe2,
+  speed: Zap,
+  email: Mail,
+  security: ShieldCheck,
+  online: Gauge,
+  visitors: Users,
+};
+const IMPACT_TONE = { error: "fail", warning: "warn", good: "pass", not_checked: null } as const;
+
+/** The findings grouped by what they mean for the business: "Your emails may land in spam". */
+function ImpactSummary({ groups }: { groups: ImpactGroup[] }) {
+  const { t } = useT();
+  return (
+    <section aria-labelledby="impact" className="rise-enter mt-7 lg:mt-8">
+      <div className="flex flex-col gap-1 px-1 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
+        <h2 id="impact" className="font-display text-[22px] font-bold tracking-tight">{t("scan.impact")}</h2>
+        <p className="text-2 text-[14px] leading-snug">{t("scan.impact_text")}</p>
+      </div>
+      <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {groups.map((g) => {
+          const tone = IMPACT_TONE[g.status];
+          const Icon = IMPACT_ICON[g.key] ?? ShieldCheck;
+          return (
+            <li key={g.key} className="glass flex gap-3 rounded-[24px] p-4">
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                style={{ background: tone ? `var(--tint-${tone})` : "var(--field-fill)" }}
+              >
+                <Icon size={19} className={tone ? `ink-${tone}` : "text-3"} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[16px] font-semibold leading-snug">{g.label}</span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[14px] font-medium" style={{ color: tone ? `var(--${tone}-ink)` : "var(--label-2)" }}>
+                  {g.count}
+                </span>
+                {g.top.length ? <span className="text-2 mt-1 block text-[13px] leading-snug">{g.top.join(" · ")}</span> : null}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** The homepage as the test phone showed it, next to the changes that would speed it up most. */
+function PhoneView({ scan }: { scan: Scan }) {
+  const { t } = useT();
+  const fixes = scan.speed_fixes ?? [];
+  return (
+    <section aria-labelledby="phone-view" className="rise-enter">
+      <SectionTitle id="phone-view">{scan.screenshot ? t("scan.phone") : t("scan.speed_fixes")}</SectionTitle>
+      <div className="glass mt-3 flex flex-col gap-5 rounded-glass p-5 sm:flex-row sm:items-start">
+        {scan.screenshot ? (
+          <figure className="mx-auto w-[150px] shrink-0 sm:mx-0">
+            <img
+              src={scan.screenshot}
+              alt={t("scan.phone_alt")}
+              width={150}
+              className="block w-full rounded-[18px] border-[5px] shadow-lg"
+              style={{ borderColor: "var(--label)" }}
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption className="text-3 mt-2 flex items-center justify-center gap-1 text-center text-[12px]">
+              <Smartphone size={13} aria-hidden="true" /> {t("scan.phone_caption")}
+            </figcaption>
+          </figure>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          {scan.screenshot ? <h3 className="text-[17px] font-semibold">{t("scan.speed_fixes")}</h3> : null}
+          <p className="text-2 mt-0.5 text-[14px] leading-snug">{fixes.length ? t("scan.speed_fixes_text") : t("scan.speed_none")}</p>
+          {fixes.length ? (
+            <ol className="mt-3 space-y-3">
+              {fixes.map((f) => (
+                <li key={f.id} className="hairline border-t pt-3 first:border-t-0 first:pt-0">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <span className="text-[15px] font-semibold leading-snug">{f.title}</span>
+                    <span className="ink-pass shrink-0 text-[13px] font-semibold">{f.saving}</span>
+                  </div>
+                  <p className="text-2 mt-0.5 text-[14px] leading-snug">{f.detail}</p>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Everything that passed: worth knowing, and good news to share. */
+function GoodList({ results }: { results: CheckResult[] }) {
+  const { t } = useT();
+  const [all, setAll] = useState(false);
+  const good = results.filter((r) => r.status === "pass" && r.weight > 0);
+  if (!good.length) return null;
+  const shown = all ? good : good.slice(0, 8);
+  return (
+    <section aria-labelledby="already-good" className="rise-enter">
+      <div className="flex items-baseline justify-between gap-3 px-1">
+        <h2 id="already-good" className="font-display text-[22px] font-bold tracking-tight">{t("scan.good")}</h2>
+        <span className="text-2 text-[14px] font-medium">{t("scan.good_n", { n: good.length })}</span>
+      </div>
+      <ul className="glass mt-3 grid gap-x-6 gap-y-2.5 rounded-glass p-5 sm:grid-cols-2">
+        {shown.map((r) => (
+          <li key={r.key} className="flex items-start gap-2.5 text-[15px] leading-snug">
+            <Check size={18} strokeWidth={2.8} className="ink-pass mt-[1px] shrink-0" aria-hidden="true" />
+            {r.title}
+          </li>
+        ))}
+      </ul>
+      {good.length > 8 ? (
+        <button type="button" className="ink-brand mt-2 px-1 py-2 text-[15px] font-semibold" onClick={() => setAll((a) => !a)} aria-expanded={all}>
+          {all ? t("scan.good_hide") : t("scan.good_show")}
+        </button>
+      ) : null}
+    </section>
   );
 }

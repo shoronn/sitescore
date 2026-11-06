@@ -5,6 +5,7 @@ import { api, ApiError, type Lead, type PublicConfig } from "../api";
 import { ErrorText, Field } from "../components/Form";
 import Sheet from "../components/Sheet";
 import Turnstile from "../components/Turnstile";
+import { useT } from "../i18n";
 
 /** Email and optional details. Loaded on demand, so the home page stays light. */
 export default function SignInSheet({
@@ -12,7 +13,7 @@ export default function SignInSheet({
   onClose,
   config,
   initialEmail,
-  submitLabel = "Start my free scan",
+  submitLabel,
   onSignedIn,
 }: {
   open: boolean;
@@ -22,6 +23,7 @@ export default function SignInSheet({
   submitLabel?: string;
   onSignedIn: (l: Lead) => void;
 }) {
+  const { t } = useT();
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState("");
   const [business, setBusiness] = useState("");
@@ -34,7 +36,7 @@ export default function SignInSheet({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next: Record<string, string> = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "Enter a valid email address.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = t("sheet.email_invalid");
     setErrors(next);
     if (Object.keys(next).length) return;
     setBusy(true);
@@ -56,9 +58,9 @@ export default function SignInSheet({
   };
 
   return (
-    <Sheet open={open} title="Where should we send your report?" onClose={onClose}>
+    <Sheet open={open} title={t("sheet.title")} onClose={onClose}>
       <form onSubmit={submit} noValidate className="space-y-4">
-        <Field label="Email" error={errors.email}>
+        <Field label={t("sheet.email")} error={errors.email}>
           <input
             className="field"
             type="email"
@@ -72,14 +74,14 @@ export default function SignInSheet({
           />
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
-          <Field label="Your name" optional error={errors.name}>
+          <Field label={t("sheet.name")} optional error={errors.name}>
             <input className="field" autoComplete="name" enterKeyHint="next" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Business name" optional error={errors.business_name}>
+          <Field label={t("sheet.business")} optional error={errors.business_name}>
             <input className="field" autoComplete="organization" enterKeyHint="next" value={business} onChange={(e) => setBusiness(e.target.value)} />
           </Field>
         </div>
-        <Field label="Phone" optional error={errors.phone}>
+        <Field label={t("sheet.phone")} optional error={errors.phone}>
           <input
             className="field"
             type="tel"
@@ -96,13 +98,13 @@ export default function SignInSheet({
 
         <button type="submit" className="btn-primary w-full" disabled={busy} aria-busy={busy || undefined}>
           {busy ? <Loader2 className="spin" size={20} aria-hidden="true" /> : null}
-          {busy ? "Checking..." : submitLabel}
+          {busy ? t("sheet.checking") : submitLabel ?? t("home.start_scan")}
           {busy ? null : <ArrowRight size={19} aria-hidden="true" />}
         </button>
         <p className="text-2 text-[13px] leading-relaxed">
-          Your PDF report goes to this address, so please check it is right. A MAKTECH advisor may contact you about your results. See our{" "}
-          <Link to="/privacy" className="font-semibold underline underline-offset-2" target="_blank">privacy notice</Link> and{" "}
-          <Link to="/terms" className="font-semibold underline underline-offset-2" target="_blank">terms</Link>.
+          {t("sheet.note")}{" "}
+          <Link to="/privacy" className="font-semibold underline underline-offset-2" target="_blank">{t("sheet.privacy")}</Link> {t("sheet.and")}{" "}
+          <Link to="/terms" className="font-semibold underline underline-offset-2" target="_blank">{t("sheet.terms")}</Link>{t("scan.verdict_end")}
         </p>
       </form>
     </Sheet>

@@ -1,6 +1,7 @@
 import { m } from "motion/react";
 import type { CheckResult, Scan } from "../api";
-import { AGENT_AREA, AGENT_SCORED } from "../checks";
+import { AGENT_AREA, AGENT_SCORED, checkBlurb, checkName } from "../checks";
+import { useT } from "../i18n";
 import { EASE_OUT } from "../motion";
 import StatusIcon from "./StatusIcon";
 
@@ -8,6 +9,7 @@ const TONE = { good: "pass", attention: "warn", risk: "fail" } as const;
 
 /** The AI agent readiness score: shown first on the results page, before website health. */
 export default function AgentReadiness({ scan, byKey }: { scan: Scan; byKey: Record<string, CheckResult> }) {
+  const { t, n } = useT();
   const a = scan.agent;
   const tone = a.band ? TONE[a.band] : null;
   const passed = AGENT_SCORED.filter((c) => byKey[c.key]?.status === "pass").length;
@@ -23,15 +25,15 @@ export default function AgentReadiness({ scan, byKey }: { scan: Scan; byKey: Rec
       <div className="relative grid gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:gap-10">
         <div>
           <h2 id="agent-title" className="ink-brand flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.06em]">
-            <Icon size={16} aria-hidden="true" /> {AGENT_AREA.label}
+            <Icon size={16} aria-hidden="true" /> {t("area.agent")}
           </h2>
           <div className="mt-3 flex items-end gap-3">
             <p
               className="tabular font-display text-[64px] font-bold leading-[0.9] tracking-[-0.04em] lg:text-[76px]"
               style={{ color: tone ? `var(--${tone}-ink)` : "var(--label-3)" }}
             >
-              {a.score ?? "--"}
-              <span className="text-3 ml-1 text-[18px] font-semibold tracking-normal">/100</span>
+              {a.score === null ? "--" : n(a.score)}
+              <span className="text-3 ml-1 text-[18px] font-semibold tracking-normal">{t("per_100")}</span>
             </p>
           </div>
           {a.label ? (
@@ -44,8 +46,8 @@ export default function AgentReadiness({ scan, byKey }: { scan: Scan; byKey: Rec
           ) : null}
           <p className="text-2 mt-3 max-w-[34ch] text-[15px] leading-snug">
             {a.score === null
-              ? "We could not load your site to check this."
-              : `${passed} of ${AGENT_SCORED.length} passed. ${AGENT_AREA.blurb}`}
+              ? t("agent.not_loaded")
+              : `${t("agent.passed", { passed, total: AGENT_SCORED.length })} ${t("area.agent_blurb")}`}
           </p>
         </div>
 
@@ -64,15 +66,15 @@ export default function AgentReadiness({ scan, byKey }: { scan: Scan; byKey: Rec
                 >
                   <StatusIcon status={r?.status} size={24} />
                   <span className="min-w-0">
-                    <span className="text-3 block text-[12px] font-semibold uppercase tracking-[0.05em]">{c.name}</span>
-                    <span className="mt-0.5 block text-[15px] font-semibold leading-snug">{r?.title ?? c.blurb}</span>
+                    <span className="text-3 block text-[12px] font-semibold uppercase tracking-[0.05em]">{t(checkName(c.key))}</span>
+                    <span className="mt-0.5 block text-[15px] font-semibold leading-snug">{r?.title ?? t(checkBlurb(c.key))}</span>
                   </span>
                 </m.li>
               );
             })}
           </ul>
           <p className="text-3 mt-3 px-1 text-[13px] leading-snug">
-            {llms ? `${llms.title}. ` : ""}Each finding is explained under Every check below.
+            {llms ? `${llms.title}${t("scan.verdict_end")} ` : ""}{t("agent.below")}
           </p>
         </div>
       </div>

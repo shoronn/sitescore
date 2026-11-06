@@ -73,7 +73,31 @@ server {
         try_files $uri =404;
     }
 
-    # Every other path is the single-page app (e.g. /scan/<token>, /admin).
+    # The app's own pages: the same app page, with an empty root that the script fills in.
+    location ~ ^/(about|privacy|terms|admin|admin/login|admin/leads/[0-9]+|scan/[A-Za-z0-9_-]+)/?$ {
+        add_header Cache-Control "no-cache";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        try_files /app.html =404;
+    }
+
+    # The app page itself is only ever served through the rules above and below.
+    location = /app.html {
+        internal;
+        add_header Cache-Control "no-cache";
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    }
+
+    # Static files from the build (logo, images). Anything else does not exist: it gets the
+    # app page with status 404, so visitors see a friendly "page not found" and search
+    # engines know the address is not a real page.
     location / {
         add_header Cache-Control "no-cache";
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Zn3T8Sj3IEQTJYXST7PjNt+Nw3+Wp/LT/M2KgPwoJoY=' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' ${VITE_API_BASE}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
@@ -81,6 +105,7 @@ server {
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-        try_files $uri /index.html;
+        try_files $uri =404;
     }
+    error_page 404 /app.html;
 }

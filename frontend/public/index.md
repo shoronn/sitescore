@@ -17,13 +17,16 @@ Run a check: https://sitescore.maktechgroup.com/
 
 llms.txt is shown too, but not scored.
 
-### Website health (23 checks)
+### Website health (33 checks)
 
 - **Security**: HTTPS, SSL certificate, security headers, software versions, exposed files, open folders, secure page content, cookie safety, security contact and DNSSEC.
 - **Reliability**: uptime and response time, domain expiry and DNS health.
-- **Email**: SPF, DKIM, DMARC and spam blocklists.
-- **Performance**: mobile speed score and Core Web Vitals, measured in a real browser on a simulated mid-range phone.
-- **Search and sharing**: title and description, mobile-friendly setup, search engine access and sharing preview.
+- **Email**: SPF, DKIM, DMARC, encrypted mail delivery (MTA-STS and TLS reporting) and spam blocklists.
+- **Performance**: mobile speed score and Core Web Vitals, measured in a real browser on a simulated mid-range phone, with the top fixes and the time each would save.
+- **Search and sharing**: title and description, mobile-friendly setup, search engine access, main page address (canonical), business details for Google (schema.org), missing-page handling and sharing preview.
+- **Content and accessibility**: accessibility score, page headings, image descriptions, amount of text, contact details and page basics.
+
+Findings are grouped by what they mean for the business: found by AI assistants, found on Google, page speed, emails reaching the inbox, security, staying online and visitor experience. SiteScore works in English and Bangla (বাংলা).
 
 ## How it works
 

@@ -41,7 +41,7 @@ class FakeDNS:
 def make_ctx(dns=None, handler=None, target="example.com", settings=None):
     transport = httpx.MockTransport(handler or (lambda req: httpx.Response(200, text="ok")))
     client = httpx.AsyncClient(transport=transport, follow_redirects=False)
-    return ScanContext(target, settings=settings or EngineSettings(skip_speed_test=True),
+    return ScanContext(target, settings=settings or EngineSettings(skip_speed_test=True, render_pages=False),
                        http_client=client, dns_client=dns or FakeDNS(), skip_guard=True)
 
 
@@ -50,15 +50,15 @@ def make_ctx(dns=None, handler=None, target="example.com", settings=None):
 def test_health_and_agent_checks_each_worth_100_points():
     from sitescore.engine.checks import AGENT_KEYS, AGENT_WEIGHT
 
-    assert len(CHECKS) == 30
+    assert len(CHECKS) == 40
     assert TOTAL_WEIGHT == 100 and AGENT_WEIGHT == 100
     by_cat = {}
     for c in CHECKS:
         by_cat[c.category] = by_cat.get(c.category, 0) + c.weight
-    # Reliability: uptime 9, domain expiry 5, DNS 5 (the backup question is gone).
-    # Performance: mobile speed 9, Core Web Vitals 6.
-    assert by_cat == {Category.SECURITY: 40, Category.RELIABILITY: 19, Category.EMAIL: 16,
-                      Category.PERFORMANCE: 15, Category.SEO: 10, Category.AGENT: 100}
+    # Security 36, reliability 16 (uptime 8, domain expiry 4, DNS 4), email 15 (with MTA-STS),
+    # performance 13 (mobile speed 8, Core Web Vitals 5), search 12, content and accessibility 8.
+    assert by_cat == {Category.SECURITY: 36, Category.RELIABILITY: 16, Category.EMAIL: 15,
+                      Category.PERFORMANCE: 13, Category.SEO: 12, Category.CONTENT: 8, Category.AGENT: 100}
     assert [c.key for c in CHECKS[:len(AGENT_KEYS)]] == AGENT_KEYS
     # llms.txt is shown for information only.
     assert next(c for c in CHECKS if c.key == "llms_txt").weight == 0
@@ -487,7 +487,8 @@ async def test_full_scan_offline(monkeypatch):
     assert findings.nice_date("2026-11-08") == "8 Nov 2026"
     assert by_key["headers"].summary == "None of the 5 recommended security headers are set."
     assert 0 <= report.score <= 100 and report.band in ("good", "attention", "risk")
-    not_run = {"domain_expiry", "mobile_speed", "web_vitals"}
+    # No speed test in this offline scan, no expiry date, and the fake domain receives no email.
+    not_run = {"domain_expiry", "mobile_speed", "web_vitals", "accessibility", "mta_sts"}
     assert {r.key for r in report.results if r.status == Status.NOT_CHECKED} == not_run
     assert report.coverage == 100 - sum(c.weight for c in CHECKS if c.key in not_run)
     # The agent checks run in the same scan and have their own score.
@@ -642,4 +643,4 @@ async def test_slow_speed_test_is_not_cut_off_by_the_normal_check_limit():
     result = await _run_one(ctx, mobile)
     assert result.status == Status.WARN and result.evidence.get("score") == 62
     # Every other check keeps the normal, shorter limit.
-    assert [c.key for c in CHECKS if c.slow] == ["mobile_speed", "web_vitals"]
+    assert [c.key for c in CHECKS if c.slow] == ["mobile_speed", "web_vitals", "accessibility"]

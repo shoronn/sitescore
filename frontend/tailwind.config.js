@@ -13,8 +13,8 @@ export default {
         night: { DEFAULT: "#000000", 2: "#1C1C1E", 3: "#2C2C2E" },
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
-        display: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans Bengali", "sans-serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans Bengali", "sans-serif"],
       },
       borderRadius: { glass: "28px", capsule: "999px" },
     },

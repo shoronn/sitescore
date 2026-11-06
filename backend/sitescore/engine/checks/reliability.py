@@ -45,7 +45,7 @@ def parse_rdap_expiry(data: dict) -> datetime | None:
     return None
 
 
-@check("domain_expiry", "Domain expiry", Category.RELIABILITY, 5)
+@check("domain_expiry", "Domain expiry", Category.RELIABILITY, 4)
 async def check_domain_expiry(ctx) -> Outcome:
     tld = ctx.apex.rsplit(".", 1)[-1]
     try:
@@ -77,7 +77,7 @@ async def check_domain_expiry(ctx) -> Outcome:
 # ---------------------------------------------------------------- DNS health
 
 
-@check("dns", "DNS health", Category.RELIABILITY, 5)
+@check("dns", "DNS health", Category.RELIABILITY, 4)
 async def check_dns(ctx) -> Outcome:
     try:
         nameservers = await ctx.dns.ns(ctx.apex)

@@ -69,6 +69,8 @@ class Scan(Base):
     coverage: Mapped[int | None] = mapped_column(Integer)
     # AI agent readiness, out of 100, scored separately from the health score.
     agent_score: Mapped[int | None] = mapped_column(Integer)
+    # The visitor's language when they started the scan ("en" or "bn"): the report email and PDF use it.
+    lang: Mapped[str] = mapped_column(String(5), default="en", server_default="en")
     error_code: Mapped[str | None] = mapped_column(String(32))
     error_message: Mapped[str | None] = mapped_column(String(300))
     engine_version: Mapped[str | None] = mapped_column(String(16))

@@ -37,7 +37,7 @@ log = logging.getLogger("sitescore.speed")
 CHROME_CANDIDATES = ("/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable")
 
 # Never shown to visitors; staff see them in the dashboard and the worker log.
-SKIP_AUDITS = "full-page-screenshot,screenshot-thumbnails,final-screenshot,network-requests,main-thread-tasks"
+SKIP_AUDITS = "full-page-screenshot,screenshot-thumbnails,network-requests,main-thread-tasks"
 # Least time worth starting a test with. Lighthouse needs roughly 15 to 45 seconds.
 MIN_RUN_SECONDS = 50
 # Longest single attempt, so a hung first try still leaves time for a second one.
@@ -147,7 +147,7 @@ async def run_speed_test(
     ignore_cert_errors: bool = False,
     min_free_mb: int = 600,
 ) -> dict[str, Any]:
-    """Run Lighthouse (mobile, performance only) on `url`.
+    """Run Lighthouse (mobile; performance and accessibility) on `url`.
 
     Returns {"lhr": <Lighthouse result>} or {"error": <code>, "detail": <text>}.
     Error codes: no_tools, busy, timeout, crashed, and Lighthouse's own runtime errors
@@ -196,29 +196,34 @@ async def run_speed_test(
         slot.release()
 
 
+def _chrome_flags(proxy_port: int, ignore_cert_errors: bool) -> list[str]:
+    flags = [
+        "--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+        # A server has no graphics chip. Without this, a WebGL page (three.js and the like)
+        # is drawn frame by frame in software, or retries WebGL in a loop, and shows a
+        # minute or more of "blocking time" that no phone with a GPU would ever see.
+        "--disable-3d-apis",
+        f"--proxy-server=http://127.0.0.1:{proxy_port}",
+        # Send even localhost through the proxy (Chrome skips the proxy for it by default).
+        "--proxy-bypass-list=<-loopback>",
+        "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--disable-background-networking", "--disable-component-update", "--disable-sync",
+        "--disable-default-apps", "--disable-extensions", "--mute-audio", "--no-first-run",
+    ]
+    if ignore_cert_errors:
+        flags.append("--ignore-certificate-errors")
+    return flags
+
+
 async def _run_once(cmd: list[str], chrome: str, url: str, budget: float, ignore_cert_errors: bool) -> dict[str, Any]:
     async with EgressProxy() as proxy:
-        flags = [
-            "--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
-            # A server has no graphics chip. Without this, a WebGL page (three.js and the like)
-            # is drawn frame by frame in software, or retries WebGL in a loop, and shows a
-            # minute or more of "blocking time" that no phone with a GPU would ever see.
-            "--disable-3d-apis",
-            f"--proxy-server=http://127.0.0.1:{proxy.port}",
-            # Send even localhost through the proxy (Chrome skips the proxy for it by default).
-            "--proxy-bypass-list=<-loopback>",
-            "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-            "--disable-background-networking", "--disable-component-update", "--disable-sync",
-            "--disable-default-apps", "--disable-extensions", "--mute-audio", "--no-first-run",
-        ]
-        if ignore_cert_errors:
-            flags.append("--ignore-certificate-errors")
+        flags = _chrome_flags(proxy.port, ignore_cert_errors)
         with tempfile.TemporaryDirectory(prefix="sitescore-lh-") as tmp:
             out = Path(tmp) / "lhr.json"
             args = [
                 *cmd, url,
                 "--output=json", f"--output-path={out}",
-                "--only-categories=performance",
+                "--only-categories=performance,accessibility",
                 f"--skip-audits={SKIP_AUDITS}",
                 "--quiet",
                 f"--max-wait-for-load={int(min(45, max(15, budget - 30)) * 1000)}",
@@ -254,6 +259,63 @@ async def _run_once(cmd: list[str], chrome: str, url: str, budget: float, ignore
     if runtime.get("code") and runtime.get("code") != "NO_ERROR":
         return {"error": runtime["code"], "detail": (runtime.get("message") or "")[:300]}
     return {"lhr": lhr}
+
+
+RENDER_WAIT_SECONDS = 15
+
+
+async def render_dom(
+    url: str,
+    *,
+    chrome_path: str | None = None,
+    slots: int = 2,
+    slot_dir: str = "/tmp/sitescore-speed",
+    budget: float = 30.0,
+    ignore_cert_errors: bool = False,
+    min_free_mb: int = 600,
+) -> str | None:
+    """The homepage's HTML after its scripts have run, or None if the browser could not do it.
+
+    Sites built with React, Vue and the like send an almost empty page and build the content
+    in the browser. Google renders those pages before reading them, so the content checks do
+    the same. Same browser lockdown as the speed test (every request through the egress
+    filter), with its own small set of slots so it never waits behind a long speed test.
+    """
+    chrome = find_chrome(chrome_path)
+    if chrome is None:
+        return None
+    slot = _Slot(os.path.join(slot_dir, "render"), max(1, slots))
+    give_up = time.monotonic() + RENDER_WAIT_SECONDS
+    while True:
+        if slot.try_take():
+            free = available_memory_mb()
+            if free is None or free >= min_free_mb:
+                break
+            slot.release()
+        if time.monotonic() > give_up:
+            return None
+        await asyncio.sleep(0.5)
+    try:
+        async with EgressProxy() as proxy:
+            with tempfile.TemporaryDirectory(prefix="sitescore-dom-") as tmp:
+                args = [chrome, *_chrome_flags(proxy.port, ignore_cert_errors), f"--user-data-dir={tmp}",
+                        "--dump-dom", "--virtual-time-budget=8000", "--window-size=412,915", url]
+                proc = await asyncio.create_subprocess_exec(
+                    *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                    env={**os.environ, "TMPDIR": tmp, "HOME": tmp}, start_new_session=True,
+                    preexec_fn=_mark_expendable)
+                try:
+                    out, _ = await asyncio.wait_for(proc.communicate(), timeout=budget)
+                except asyncio.TimeoutError:
+                    return None
+                finally:
+                    _kill_group(proc)
+                    if proc.returncode is None:
+                        await proc.wait()
+        html = (out or b"")[:2_000_000].decode("utf-8", "replace")
+        return html if "<" in html else None
+    finally:
+        slot.release()
 
 
 def _kill_group(proc: asyncio.subprocess.Process) -> None:
@@ -293,6 +355,68 @@ def lab_metrics(lhr: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Speed fixes we explain in plain words (findings.SPEED_FIXES), from Lighthouse's audits.
+# Classic "opportunity" audits report overallSavingsMs; the newer "insight" audits report
+# metricSavings per metric. Either way: the estimated time saved on loading.
+SPEED_FIX_AUDITS = (
+    "render-blocking-insight", "render-blocking-resources", "image-delivery-insight", "uses-optimized-images",
+    "modern-image-formats", "uses-responsive-images", "offscreen-images", "unused-javascript",
+    "unused-css-rules", "unminified-javascript", "unminified-css", "uses-text-compression",
+    "document-latency-insight", "server-response-time", "cache-insight", "uses-long-cache-ttl",
+    "font-display-insight", "font-display", "legacy-javascript-insight", "legacy-javascript",
+    "duplicated-javascript-insight", "duplicated-javascript", "third-parties-insight", "third-party-summary",
+    "lcp-discovery-insight", "prioritize-lcp-image", "redirects", "efficient-animated-content",
+)
+# The same fix under its old and new audit name counts once.
+_SAME_FIX = {"render-blocking-resources": "render-blocking-insight", "uses-optimized-images": "image-delivery-insight",
+             "modern-image-formats": "image-delivery-insight", "uses-responsive-images": "image-delivery-insight",
+             "server-response-time": "document-latency-insight", "uses-long-cache-ttl": "cache-insight",
+             "font-display": "font-display-insight", "legacy-javascript": "legacy-javascript-insight",
+             "duplicated-javascript": "duplicated-javascript-insight", "third-party-summary": "third-parties-insight",
+             "prioritize-lcp-image": "lcp-discovery-insight"}
+
+
+def speed_fixes(lhr: dict[str, Any], limit: int = 3, min_ms: int = 150) -> list[dict[str, Any]]:
+    """The few changes that would save the most loading time: [{"id": ..., "ms": ...}]."""
+    audits = lhr.get("audits") or {}
+    best: dict[str, int] = {}
+    for aid in SPEED_FIX_AUDITS:
+        a = audits.get(aid) or {}
+        if a.get("score") is None or a.get("score") >= 0.9:
+            continue
+        details = a.get("details") or {}
+        saved = details.get("overallSavingsMs")
+        if not isinstance(saved, (int, float)):
+            ms = a.get("metricSavings") or {}
+            saved = max((v for k, v in ms.items() if k in ("LCP", "FCP") and isinstance(v, (int, float))), default=0)
+        key = _SAME_FIX.get(aid, aid)
+        if saved >= min_ms and saved > best.get(key, 0):
+            best[key] = round(saved)
+    ranked = sorted(best.items(), key=lambda kv: -kv[1])[:limit]
+    return [{"id": k, "ms": v} for k, v in ranked]
+
+
+def accessibility(lhr: dict[str, Any], limit: int = 5) -> dict[str, Any]:
+    """Lighthouse's accessibility score (0 to 100) and its failing audits, most important first."""
+    cat = (lhr.get("categories") or {}).get("accessibility") or {}
+    if cat.get("score") is None:
+        return {}
+    audits = lhr.get("audits") or {}
+    failing = [(ref.get("weight", 0), ref["id"]) for ref in cat.get("auditRefs", [])
+               if (audits.get(ref.get("id")) or {}).get("score") == 0]
+    failing.sort(key=lambda x: -x[0])
+    return {"score": round(cat["score"] * 100), "issues": [aid for _w, aid in failing[:limit]],
+            "issue_total": len(failing)}
+
+
+def final_screenshot(lhr: dict[str, Any], max_chars: int = 120_000) -> str | None:
+    """The phone-sized picture of the loaded page, as a data: URL (a small JPEG)."""
+    data = (((lhr.get("audits") or {}).get("final-screenshot") or {}).get("details") or {}).get("data")
+    if isinstance(data, str) and data.startswith("data:image/") and len(data) <= max_chars:
+        return data
+    return None
+
+
 # ---------------------------------------------------------------- optional fallback
 
 PSI_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
@@ -308,7 +432,7 @@ async def pagespeed_fallback(url: str, api_key: str, budget: float) -> dict[str,
     import httpx
 
     deadline = time.monotonic() + budget
-    params = {"url": url, "strategy": "mobile", "category": "performance", "key": api_key}
+    params = {"url": url, "strategy": "mobile", "category": ["performance", "accessibility"], "key": api_key}
     result: dict[str, Any] = {"error": "pagespeed_not_run", "detail": ""}
     for attempt in range(2):
         remaining = deadline - time.monotonic()

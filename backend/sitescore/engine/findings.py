@@ -168,6 +168,10 @@ FINDINGS: dict[str, dict[str, dict[str, str]]] = {
                          summary="Your site uses a self-signed certificate that browsers do not trust.",
                          why="Every visitor sees a security warning before reaching your site.",
                          fix="We replace it with a free, trusted certificate that renews itself.", offer="fixit"),
+        "incomplete_chain": W(title="SSL certificate chain is incomplete",
+                              summary="Your server sends its certificate without the middle certificate that links it to a trusted authority.",
+                              why="Desktop browsers often cope, but many phones, apps and payment services show an error or refuse to connect.",
+                              fix="We install the full certificate chain, so every device trusts it.", offer="fixit"),
         "invalid": W(title="SSL certificate is not valid",
                      summary="Browsers reject your certificate: {verify_error}.",
                      why="Visitors see a security warning instead of your site.",
@@ -296,6 +300,10 @@ FINDINGS: dict[str, dict[str, dict[str, str]]] = {
                     summary="Your SPF record does not say what to do with unknown senders.",
                     why="Mail servers fall back to accepting email from anyone claiming to be you.",
                     fix="We finish the record with a safe \"~all\" or \"-all\" ending.", offer="email_setup"),
+        "near_limit": W(title="SPF record is close to its limit",
+                        summary="Checking your SPF needs {lookups} DNS lookups; the limit is 10.",
+                        why="Add one more email service (a newsletter tool or CRM) and SPF breaks, sending your mail to spam.",
+                        fix="We simplify the record now, so there is room to grow.", offer="email_setup"),
         "neutral": W(title="SPF record is too relaxed",
                      summary="Your SPF ends in \"?all\", so unknown senders are neither allowed nor blocked.",
                      why="It gives almost no protection against people sending as you.",
@@ -342,6 +350,28 @@ FINDINGS: dict[str, dict[str, dict[str, str]]] = {
                     summary="Your {source} address is on: {listed_list}.",
                     why="Many receivers reject or spam-folder every email from a listed address.",
                     fix="We find the cause, clean it up and request removal.", offer="email_setup"),
+    },
+    "mta_sts": {
+        "ok": W(title="Incoming mail is always encrypted",
+                summary="Your domain publishes an MTA-STS policy ({mode} mode) and asks for TLS reports.",
+                why="Other mail servers must use checked encryption when they deliver to you, so nobody can read your mail on the way.",
+                fix="Nothing to do.", offer="none"),
+        "missing": W(title="Incoming mail encryption is optional",
+                     summary="Your domain has no MTA-STS policy and no TLS reporting.",
+                     why="Mail sent to you may fall back to no encryption without anyone noticing. Larger customers and banks increasingly expect this.",
+                     fix="We publish an MTA-STS policy and TLS reporting for your domain.", offer="email_setup"),
+        "no_tlsrpt": W(title="No reports on mail encryption",
+                       summary="Your MTA-STS policy is set, but your domain does not ask for TLS reports.",
+                       why="If encrypted delivery to you starts failing, nobody tells you.",
+                       fix="We add a TLS reporting record and watch the reports for you.", offer="email_setup"),
+        "no_sts": W(title="Incoming mail encryption is optional",
+                    summary="Your domain asks for TLS reports but has no MTA-STS policy.",
+                    why="Without the policy, mail sent to you may still fall back to no encryption.",
+                    fix="We publish an MTA-STS policy to go with your reporting.", offer="email_setup"),
+        "broken_policy": W(title="MTA-STS policy does not load",
+                           summary="Your DNS announces MTA-STS, but the policy file at mta-sts.{apex} does not load properly.",
+                           why="Mail servers ignore a policy they cannot read, so the protection is not working.",
+                           fix="We publish the policy file over HTTPS with a valid certificate.", offer="email_setup"),
     },
     "mobile_speed": {
         "ok": W(title="Fast on mobile",
@@ -515,6 +545,64 @@ FINDINGS: dict[str, dict[str, dict[str, str]]] = {
                      why="Google cannot read your pages, so they drop out of search results.",
                      fix="We fix robots.txt and ask Google to read your site again.", offer="fixit"),
     },
+    "canonical": {
+        "ok": W(title="Main page address is set",
+                summary="Your homepage tells search engines its main address: {canonical}.",
+                why="Google combines the www, non-www and tracking-link versions of a page into one, so they do not compete.",
+                fix="Nothing to do.", offer="none"),
+        "missing": W(title="No main page address",
+                     summary="Your homepage does not tell search engines its main address (canonical link).",
+                     why="Google may treat the www, non-www and tracking-link versions as separate pages and split your ranking between them.",
+                     fix="We add a canonical link to every page.", offer="fixit"),
+        "other_site": W(title="Main page address points to another site",
+                        summary="Your homepage says its main address is {canonical}, which is on a different domain.",
+                        why="Google may drop your page from results and show the other address instead.",
+                        fix="We point the canonical link back to your own domain.", offer="fixit"),
+        "insecure": W(title="Main page address uses http",
+                      summary="Your canonical link points to {canonical}, the insecure version of your page.",
+                      why="It tells Google to prefer the version without the padlock.",
+                      fix="We change it to the https address.", offer="fixit"),
+    },
+    "structured_data": {
+        "ok": W(title="Business details are marked up for Google",
+                summary="Your homepage describes your business ({business}) in a format search engines read.",
+                why="Google can show your phone number, address and opening hours right in search results and Maps.",
+                fix="Nothing to do.", offer="none"),
+        "incomplete": W(title="Business details are incomplete",
+                        summary="Your homepage describes your business ({business}), but leaves out: {missing_list}.",
+                        why="Google cannot show your contact details in search results without them.",
+                        fix="We complete your business details: name, phone, address and opening hours.", offer="fixit"),
+        "no_business": W(title="No business details for Google",
+                         summary="Your homepage has structured data ({types_list}), but none that describes your business.",
+                         why="Google and AI assistants have to guess your phone number, address and opening hours.",
+                         fix="We add your business details in the format Google reads (schema.org).", offer="fixit"),
+        "missing": W(title="No business details for Google",
+                     summary="Your homepage has no structured data (schema.org) about your business.",
+                     why="Google and AI assistants have to guess your phone number, address and opening hours, and often get them wrong.",
+                     fix="We add your business name, phone, address and opening hours in the format Google reads.", offer="fixit"),
+        "invalid": W(title="Business details cannot be read",
+                     summary="Your homepage has structured data, but it contains errors and cannot be read.",
+                     why="Search engines ignore it, so your details do not show in results.",
+                     fix="We repair the markup and test it with Google's tools.", offer="fixit"),
+    },
+    "error_page": {
+        "ok": W(title="Missing pages are handled properly",
+                summary="A page that does not exist answers with a proper \"not found\" (error {status}).",
+                why="Search engines drop dead links instead of listing them.",
+                fix="Nothing to do.", offer="none"),
+        "soft_404": W(title="Missing pages look like real pages",
+                      summary="A page that does not exist answers \"OK\" (status 200) instead of \"not found\".",
+                      why="Google may list empty or duplicate pages and trust your site less.",
+                      fix="We set up a proper 404 page that helps visitors find their way.", offer="fixit"),
+        "redirects": W(title="Missing pages redirect elsewhere",
+                       summary="A page that does not exist redirects (status {status}) instead of saying \"not found\".",
+                       why="Google treats this as a hidden error, and visitors land somewhere they did not expect.",
+                       fix="We set up a proper 404 page that helps visitors find their way.", offer="fixit"),
+        "server_error": W(title="Missing pages cause a server error",
+                          summary="A page that does not exist answers with a server error (status {status}).",
+                          why="It looks like your site is broken, to visitors and to Google.",
+                          fix="We fix the error handling and add a proper 404 page.", offer="fixit"),
+    },
     "social_preview": {
         "ok": W(title="Links to your site look good when shared",
                 summary="Your page has a sharing title and image, and a site icon.",
@@ -533,6 +621,106 @@ FINDINGS: dict[str, dict[str, dict[str, str]]] = {
                   why="Links shared on WhatsApp and Facebook look plain, so fewer people tap them.",
                   fix="We add a sharing title, description and image to your pages.", offer="fixit"),
     },
+    "accessibility": {
+        "ok": W(title="Easy to use for everyone",
+                summary="{tester} rates your homepage's accessibility {score} out of 100.",
+                why="People with weak eyesight or using screen readers can use your site, and so can Google.",
+                fix="Nothing to do.", offer="none"),
+        "minor": W(title="Easy to use for everyone",
+                   summary="{tester} rates your homepage's accessibility {score} out of 100. Small things to tidy up: {issues_list}.",
+                   why="People with weak eyesight or using screen readers can mostly use your site.",
+                   fix="We tidy up the remaining details.", offer="none"),
+        "some_issues": W(title="Accessibility needs work",
+                         summary="{tester} rates your homepage's accessibility {score} out of 100. Problems found: {issues_list}.",
+                         why="Hard-to-read text and unlabelled buttons lose older visitors and people on small screens. 90 or more is good.",
+                         fix="We fix contrast, labels and image descriptions across your site.", offer="fixit"),
+        "many_issues": W(title="Hard to use for many visitors",
+                         summary="{tester} rates your homepage's accessibility {score} out of 100. Problems found: {issues_list}.",
+                         why="Many visitors, especially older ones and people with weak eyesight, cannot read or use parts of your site.",
+                         fix="We fix contrast, labels and image descriptions across your site.", offer="fixit"),
+    },
+    "headings": {
+        "ok": W(title="Clear main heading",
+                summary="Your homepage has one main heading: \"{h1}\".",
+                why="Google and visitors see at a glance what the page is about.",
+                fix="Nothing to do.", offer="none"),
+        "no_h1": W(title="No main heading",
+                   summary="Your homepage has no main heading (H1).",
+                   why="The main heading is one of the strongest hints to Google about what your page is about.",
+                   fix="We add one clear main heading with the words your customers search for.", offer="fixit"),
+        "many_h1": W(title="Several main headings",
+                     summary="Your homepage has {h1_count} main headings (H1). One is best.",
+                     why="Google gets mixed signals about what the page is mainly about.",
+                     fix="We keep one main heading and turn the rest into subheadings.", offer="fixit"),
+        "skipped": W(title="Headings skip a level",
+                     summary="Your headings jump from {skipped}, skipping a level.",
+                     why="Screen readers and search engines use the heading order to understand the page.",
+                     fix="We put the headings in order.", offer="fixit"),
+    },
+    "image_alt": {
+        "ok": W(title="Images are described",
+                summary="Every image on your homepage ({images}) has a description (alt text).",
+                why="Google Images and screen readers know what each picture shows.",
+                fix="Nothing to do.", offer="none"),
+        "no_images": W(title="Images are described",
+                       summary="Your homepage has no images that need a description.",
+                       why="Nothing to describe.",
+                       fix="Nothing to do.", offer="none"),
+        "some_missing": W(title="Some images have no description",
+                          summary="{missing_count} of {images} images have no description (alt text), for example: {examples_list}.",
+                          why="Google Images cannot list them and screen readers cannot tell blind visitors what they show.",
+                          fix="We add short, useful descriptions to your images.", offer="fixit"),
+        "most_missing": W(title="Most images have no description",
+                          summary="{missing_count} of {images} images have no description (alt text), for example: {examples_list}.",
+                          why="Google Images cannot list them and screen readers cannot tell blind visitors what they show.",
+                          fix="We add short, useful descriptions to your images.", offer="fixit"),
+    },
+    "content_depth": {
+        "ok": W(title="Enough text on the homepage",
+                summary="Your homepage has about {words} words of text.",
+                why="Search engines and AI assistants have enough to understand what you offer.",
+                fix="Nothing to do.", offer="none"),
+        "thin": W(title="Little text on the homepage",
+                  summary="Your homepage has only about {words} words of text.",
+                  why="Search engines and AI assistants have little to go on, so you show up for fewer searches.",
+                  fix="We help you write clear text about your services, area and prices.", offer="fixit"),
+        "very_thin": W(title="Almost no text on the homepage",
+                       summary="Your homepage has only about {words} words of text.",
+                       why="Search engines and AI assistants cannot tell what you offer, so you rarely show up in searches.",
+                       fix="We help you write clear text about your services, area and prices.", offer="fixit"),
+        "script_only": W(title="Text only appears after scripts run",
+                         summary="Your homepage arrives almost empty ({words} words) and builds its text with JavaScript.",
+                         why="Google can usually wait for it, but most AI assistants and social apps read the empty version.",
+                         fix="We set up pre-rendering, so every visitor and bot gets the full text at once.", offer="fixit"),
+        "needs_scripts": W(title="Text only appears after scripts run",
+                           summary="Your homepage arrives with {raw_words} words; the other text (about {words} words) is built with JavaScript.",
+                           why="Google can usually wait for it, but most AI assistants and social apps read the empty version.",
+                           fix="We set up pre-rendering, so every visitor and bot gets the full text at once.", offer="fixit"),
+    },
+    "contact_info": {
+        "ok": W(title="Contact details are easy to find",
+                summary="Your homepage shows: {found_list}.",
+                why="Visitors ready to buy can reach you straight away.",
+                fix="Nothing to do.", offer="none"),
+        "contact_page_only": W(title="No contact details on the homepage",
+                               summary="Your homepage links to a contact page, but shows no phone number or email itself.",
+                               why="Every extra click loses some visitors who were ready to call.",
+                               fix="We add a visible phone number, WhatsApp button and email to your homepage.", offer="fixit"),
+        "none": W(title="No contact details found",
+                  summary="We found no phone number, email or contact page on your homepage.",
+                  why="Visitors ready to buy cannot reach you, and Google trusts businesses with clear contact details more.",
+                  fix="We add a visible phone number, WhatsApp button and email to your homepage.", offer="fixit"),
+    },
+    "page_basics": {
+        "ok": W(title="Page basics are in place",
+                summary="Your homepage declares its language, character set and document type.",
+                why="Browsers, translators and screen readers show your page correctly.",
+                fix="Nothing to do.", offer="none"),
+        "missing": W(title="Page basics are missing",
+                     summary="Your homepage does not declare its: {missing_list}.",
+                     why="Browsers may show garbled characters, offer the wrong translation, or read it aloud in the wrong language.",
+                     fix="We add the missing declarations to your page template.", offer="fixit"),
+    },
 }
 
 NOT_CHECKED = {
@@ -547,19 +735,136 @@ NOT_CHECKED = {
     "no_ip": "We found no address to check.",
     "no_https_page": "Your site does not load over working HTTPS, so this was not checked.",
     "not_html": "Your homepage did not return a normal web page, so this was not checked.",
+    "no_mx": "Your domain does not receive email, so this was not checked.",
 }
 
+
+# Accessibility problems Lighthouse reports, in plain words (by audit id).
+A11Y_ISSUES = {
+    "color-contrast": "text with too little contrast",
+    "image-alt": "images without a description",
+    "link-name": "links without readable text",
+    "button-name": "buttons without a name",
+    "label": "form fields without a label",
+    "html-has-lang": "no page language",
+    "html-lang-valid": "an invalid page language",
+    "valid-lang": "an invalid language code",
+    "document-title": "no page title",
+    "heading-order": "headings out of order",
+    "landmark-one-main": "no main content area",
+    "meta-viewport": "zooming switched off",
+    "list": "badly built lists",
+    "listitem": "badly built lists",
+    "frame-title": "embedded frames without a title",
+    "input-image-alt": "image buttons without a description",
+    "select-name": "drop-downs without a label",
+    "label-content-name-mismatch": "labels that differ from the visible text",
+    "target-size": "tap targets that are too small",
+    "duplicate-id-aria": "duplicate element ids",
+    "image-redundant-alt": "image descriptions that repeat nearby text",
+    "skip-link": "a broken skip link",
+    "bypass": "no way to skip the menu",
+    "tabindex": "a confusing keyboard order",
+    "video-caption": "videos without captions",
+    "object-alt": "embedded objects without a description",
+    "meta-refresh": "a page that refreshes itself",
+    "link-in-text-block": "links that look like plain text",
+    "identical-links-same-purpose": "identical links that go to different places",
+    "td-headers-attr": "badly labelled tables",
+    "th-has-data-cells": "badly labelled tables",
+    "definition-list": "badly built lists",
+    "dlitem": "badly built lists",
+    "form-field-multiple-labels": "form fields with several labels",
+    "input-button-name": "buttons without a name",
+    "accesskeys": "clashing keyboard shortcuts",
+    "aria": "screen reader labels (ARIA) set up wrongly",
+}
+
+# The changes that would save the most loading time (by Lighthouse audit id).
+SPEED_FIXES = {
+    "render-blocking-insight": ("Stop files from blocking the first view",
+                                "Styles and scripts load before anything appears. Load them later, or inline the small part the first screen needs."),
+    "image-delivery-insight": ("Compress and resize images",
+                               "Serve images as WebP or AVIF, at the size they are shown."),
+    "offscreen-images": ("Load images further down the page later",
+                         "Images below the first screen load before the visitor scrolls to them."),
+    "unused-javascript": ("Remove unused JavaScript",
+                          "Scripts are downloaded, but most of their code never runs on this page."),
+    "unused-css-rules": ("Remove unused CSS",
+                         "Style sheets carry many rules this page never uses."),
+    "unminified-javascript": ("Minify JavaScript", "Scripts are sent with spaces and comments left in."),
+    "unminified-css": ("Minify CSS", "Style sheets are sent with spaces and comments left in."),
+    "uses-text-compression": ("Switch on compression", "Pages, scripts and styles are sent without gzip or Brotli compression."),
+    "document-latency-insight": ("Make the server answer faster",
+                                 "The server takes too long to send the first part of the page."),
+    "cache-insight": ("Let browsers keep files longer",
+                      "Returning visitors download the same files again instead of using their saved copy."),
+    "font-display-insight": ("Show text while fonts load", "Text stays invisible until the web font has downloaded."),
+    "legacy-javascript-insight": ("Stop sending code for old browsers",
+                                  "Modern phones download extra code that only very old browsers need."),
+    "duplicated-javascript-insight": ("Remove duplicate JavaScript", "The same code library is loaded more than once."),
+    "third-parties-insight": ("Cut down third-party scripts",
+                              "Chat widgets, trackers and embeds from other companies slow the page down."),
+    "lcp-discovery-insight": ("Load the main image first",
+                              "The biggest image on the first screen is found late. Preload it and do not lazy-load it."),
+    "redirects": ("Avoid redirects", "The page passes through extra redirects before it starts loading."),
+    "efficient-animated-content": ("Use video instead of GIFs", "Animated GIFs are many times larger than the same clip as video."),
+}
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def nice_date(iso: str) -> str:
-    """2026-11-08 -> 8 Nov 2026"""
+LANGS = ("en", "bn")
+_BN_DIGITS = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
+
+
+def bn_digits(value: Any) -> str:
+    """12.5 -> ১২.৫"""
+    return str(value).translate(_BN_DIGITS)
+
+
+def nice_date(iso: str, lang: str = "en") -> str:
+    """2026-11-08 -> 8 Nov 2026 (৮ নভেম্বর ২০২৬ in Bangla)"""
     try:
         y, m, d = (int(x) for x in iso[:10].split("-"))
+        if lang == "bn":
+            from .findings_bn import MONTHS_BN
+
+            return bn_digits(f"{d} {MONTHS_BN[m - 1]} {y}")
         return f"{d} {MONTHS[m - 1]} {y}"
     except (ValueError, IndexError):
         return iso
+
+
+def a11y_label(issue: str, lang: str = "en") -> str:
+    if lang == "bn":
+        from .findings_bn import A11Y_ISSUES_BN
+
+        table = A11Y_ISSUES_BN
+    else:
+        table = A11Y_ISSUES
+    if issue in table:
+        return table[issue]
+    if issue.startswith("aria-"):
+        return table["aria"]
+    return issue.replace("-", " ")
+
+
+def speed_fix_text(fixes: list[dict[str, Any]], lang: str = "en") -> list[dict[str, Any]]:
+    """[{"id", "ms"}] from the speed test -> titles, explanations and the time each would save."""
+    if lang == "bn":
+        from .findings_bn import SPEED_FIXES_BN as table
+    else:
+        table = SPEED_FIXES
+    out = []
+    for f in fixes or []:
+        title, detail = table.get(f.get("id"), (None, None))
+        if title is None:
+            continue
+        seconds = round(f.get("ms", 0) / 1000, 1)
+        saving = f"প্রায় {bn_digits(seconds)} সেকেন্ড বাঁচবে" if lang == "bn" else f"Saves about {seconds} s"
+        out.append({"id": f["id"], "title": title, "detail": detail, "seconds": seconds, "saving": saving})
+    return out
 
 
 class _Safe(dict):
@@ -567,8 +872,26 @@ class _Safe(dict):
         return "?"
 
 
-def _fmt_values(evidence: dict[str, Any], extra: dict[str, Any]) -> _Safe:
+# Evidence values that are our own words (not names from the site) and so get translated.
+_WORD_KEYS = {"tester", "source", "found", "missing", "examples"}
+
+
+def _fmt_values(evidence: dict[str, Any], extra: dict[str, Any], lang: str = "en") -> _Safe:
     values: dict[str, Any] = dict(extra)
+    if lang == "bn":
+        from .findings_bn import VALUES_BN
+    else:
+        VALUES_BN = {}  # noqa: N806
+
+    def show(key: str, x: Any) -> str:
+        if key == "issues":
+            return a11y_label(str(x), lang)
+        if lang == "bn" and isinstance(x, (int, float)) and not isinstance(x, bool):
+            return bn_digits(x)
+        if lang == "bn" and key in _WORD_KEYS and isinstance(x, str):
+            return VALUES_BN.get(x, x)
+        return str(x)
+
     for k, v in evidence.items():
         if isinstance(v, list):
             items = []
@@ -576,18 +899,40 @@ def _fmt_values(evidence: dict[str, Any], extra: dict[str, Any]) -> _Safe:
                 if isinstance(x, dict):
                     items.append(" ".join(str(x[k2]) for k2 in ("ip", "list") if k2 in x) or str(x))
                 else:
-                    items.append(str(x))
-            values[f"{k}_list"] = ", ".join(items) if items else "none"
-            values[f"{k}_count"] = len(v)
-        values[k] = v
-    values.setdefault("ns_count", len(evidence.get("nameservers", [])))
+                    items.append(show(k, x))
+            values[f"{k}_list"] = ", ".join(items) if items else show("missing", "none")
+            values[f"{k}_count"] = bn_digits(len(v)) if lang == "bn" else len(v)
+            values[k] = v
+        elif isinstance(v, (int, float, str)) and not isinstance(v, bool):
+            values[k] = show(k, v)
+        else:
+            values[k] = v
+    ns = len(evidence.get("nameservers", []))
+    values.setdefault("ns_count", bn_digits(ns) if lang == "bn" else ns)
     if isinstance(evidence.get("expires"), str):
-        values["expires"] = nice_date(evidence["expires"])
+        values["expires"] = nice_date(evidence["expires"], lang)
     return _Safe(values)
 
 
-def word(key: str, name: str, status: str, reason: str, evidence: dict[str, Any], extra: dict[str, Any]) -> dict[str, str]:
+def check_name(key: str, name: str, lang: str = "en") -> str:
+    if lang == "bn":
+        from .findings_bn import CHECK_NAMES_BN
+
+        return CHECK_NAMES_BN.get(key, name)
+    return name
+
+
+def word(key: str, name: str, status: str, reason: str, evidence: dict[str, Any], extra: dict[str, Any],
+         lang: str = "en") -> dict[str, str]:
+    """The title, summary, why and fix for one result, in English ("en") or Bangla ("bn")."""
+    bn = lang == "bn"
+    if bn:
+        from .findings_bn import FINDINGS_BN, NOT_CHECKED_BN
     if status == "not_checked":
+        if bn:
+            return {"title": f"{check_name(key, name, lang)}: পরীক্ষা করা হয়নি",
+                    "summary": NOT_CHECKED_BN.get(reason, "এটি পরীক্ষা করা হয়নি।"),
+                    "why": "", "fix": "", "offer": "none"}
         return {
             "title": f"{name}: not checked",
             "summary": NOT_CHECKED.get(reason, "This was not checked."),
@@ -595,6 +940,8 @@ def word(key: str, name: str, status: str, reason: str, evidence: dict[str, Any]
         }
     entry = FINDINGS.get(key, {}).get(reason)
     if entry is None:
-        return {"title": name, "summary": "", "why": "", "fix": "", "offer": "none"}
-    values = _fmt_values(evidence, extra)
+        return {"title": check_name(key, name, lang), "summary": "", "why": "", "fix": "", "offer": "none"}
+    if bn:
+        entry = {**entry, **FINDINGS_BN.get(key, {}).get(reason, {})}
+    values = _fmt_values(evidence, extra, lang)
     return {k: v.format_map(values) if isinstance(v, str) else v for k, v in entry.items()}

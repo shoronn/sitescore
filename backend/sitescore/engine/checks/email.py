@@ -62,7 +62,7 @@ async def count_spf_lookups(dns, domain: str, seen: set[str] | None = None, dept
     return total, problems
 
 
-@check("spf", "SPF", Category.EMAIL, 5)
+@check("spf", "SPF", Category.EMAIL, 4)
 async def check_spf(ctx) -> Outcome:
     if not await ctx.dns_ok():
         return Outcome(Status.NOT_CHECKED, {}, "lookup_failed")
@@ -95,6 +95,9 @@ async def check_spf(ctx) -> Outcome:
         return Outcome(Status.WARN, ev, "no_all")
     if all_q == "?":
         return Outcome(Status.WARN, ev, "neutral")
+    if lookups >= 9:
+        # One more email service added (a newsletter tool, a CRM) and SPF breaks.
+        return Outcome(Status.WARN, ev, "near_limit")
     return Outcome(Status.PASS, ev, "ok")
 
 
@@ -136,7 +139,7 @@ def parse_dmarc(record: str) -> dict[str, str]:
     return tags
 
 
-@check("dmarc", "DMARC", Category.EMAIL, 5)
+@check("dmarc", "DMARC", Category.EMAIL, 4)
 async def check_dmarc(ctx) -> Outcome:
     if not await ctx.dns_ok():
         return Outcome(Status.NOT_CHECKED, {}, "lookup_failed")
@@ -214,3 +217,36 @@ async def check_blacklist(ctx) -> Outcome:
     if all(hit is None for _, _, hit in results):
         return Outcome(Status.NOT_CHECKED, ev, "lookup_failed")
     return Outcome(Status.PASS, ev, "ok")
+
+
+# ---------------------------------------------------------------- MTA-STS and TLS reporting
+
+
+@check("mta_sts", "Encrypted mail delivery", Category.EMAIL, 1)
+async def check_mta_sts(ctx) -> Outcome:
+    """MTA-STS makes other mail servers deliver to you only over checked encryption; TLS-RPT
+    asks them to report when that fails. Only meaningful for a domain that receives email."""
+    if not await ctx.dns_ok():
+        return Outcome(Status.NOT_CHECKED, {}, "lookup_failed")
+    try:
+        if not await ctx.dns.mx(ctx.apex):
+            return Outcome(Status.NOT_CHECKED, {}, "no_mx")
+        sts = any(t.strip().lower().startswith("v=stsv1") for t in await ctx.dns.txt(f"_mta-sts.{ctx.apex}"))
+        rpt = any(t.strip().lower().startswith("v=tlsrptv1") for t in await ctx.dns.txt(f"_smtp._tls.{ctx.apex}"))
+    except DNSFailure as exc:
+        return Outcome(Status.NOT_CHECKED, {"error": str(exc)}, "lookup_failed")
+    ev = {"mta_sts": sts, "tls_rpt": rpt}
+    if sts:
+        policy = await ctx.fetch(f"https://mta-sts.{ctx.apex}/.well-known/mta-sts.txt")
+        text = policy.text.lower() if policy.ok and policy.status == 200 else ""
+        mode = re.search(r"^\s*mode\s*:\s*(\w+)", text, re.M)
+        if "stsv1" not in text or not mode:
+            return Outcome(Status.WARN, ev, "broken_policy")
+        ev["mode"] = mode.group(1)
+    if sts and rpt:
+        return Outcome(Status.PASS, ev, "ok")
+    if sts:
+        return Outcome(Status.WARN, ev, "no_tlsrpt")
+    if rpt:
+        return Outcome(Status.WARN, ev, "no_sts")
+    return Outcome(Status.WARN, ev, "missing")

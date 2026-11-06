@@ -98,7 +98,8 @@ async def test_full_flow(client):
     assert data["coverage"] == 100 and data["score"] == 100 - w["dmarc"] and data["band"] == "good"
     # AI agent readiness has its own score (every agent check passes in the fake scan).
     assert data["agent"] == {"score": 100, "level": "ready", "label": "Agent ready", "band": "good"}
-    assert {c["key"] for c in data["categories"]} == {"security", "reliability", "email", "performance", "seo"}
+    assert {c["key"] for c in data["categories"]} == {"security", "reliability", "email", "performance", "seo",
+                                                      "content"}
 
     # Same site again within 10 minutes reuses the scan.
     r = await client.post("/api/scans", json={"url": "www.example.com"})
@@ -372,3 +373,34 @@ async def test_retired_checks_in_old_scans_are_ignored(client):
     assert after["categories"] == before["categories"]
     r = await client.get(f"/api/scans/{token}/report.pdf")
     assert r.status_code == 200
+
+
+async def test_bangla_results_pdf_and_email(client):
+    """A visitor using the Bangla site gets Bangla results, PDF and email; ?lang= switches either way."""
+    await sign_in(client, "bn@business.com")
+    r = await client.post("/api/scans", json={"url": "bn.example.com", "lang": "bn"})
+    token = r.json()["token"]
+    await worker.wait_inline()
+    data = (await client.get(f"/api/scans/{token}")).json()
+    assert data["lang"] == "bn" and data["band_label"] == "ভালো"
+    assert {c["key"]: c["label"] for c in data["categories"]}["email"] == "ইমেইল"
+    assert next(x for x in data["results"] if x["key"] == "ssl")["name"] == "SSL সার্টিফিকেট"
+    assert data["agent"]["label"] == "এজেন্টের জন্য প্রস্তুত"
+    assert any(g["label"] == "আপনার ইমেইল স্প্যামে যেতে পারে" for g in data["impact"])
+    english = (await client.get(f"/api/scans/{token}?lang=en")).json()
+    assert english["lang"] == "en" and english["band_label"] == "Good"
+    assert (await client.get(f"/api/scans/{token}?lang=xx")).json()["lang"] == "bn"  # unknown: the scan's own
+    mail = report_mails("bn@business.com")[0]
+    assert mail.subject.startswith("SiteScore-এ bn.example.com") and "?lang=bn" in mail.text
+    pdf = await client.get(f"/api/scans/{token}/report.pdf?lang=bn")
+    assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-"
+
+
+async def test_error_messages_follow_the_visitors_language(client):
+    r = await client.post("/api/auth/start", json={"email": "not-an-email"}, headers={"Accept-Language": "bn"})
+    assert r.status_code == 422 and r.json()["message"] == "এমন একটি সঠিক ইমেইল ঠিকানা দিন যেখানে আপনি মেইল পান।"
+    r = await client.post("/api/auth/start", json={"email": "not-an-email"})
+    assert r.json()["message"] == "Please enter a valid email address you can receive mail at."
+    await sign_in(client, "lang@business.com")
+    r = await client.post("/api/scans", json={"url": "10.0.0.1"}, headers={"Accept-Language": "bn,en;q=0.8"})
+    assert r.json()["message"] == "IP ঠিকানা নয়, একটি ডোমেইন নাম দিন।"

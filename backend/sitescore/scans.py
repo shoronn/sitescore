@@ -14,6 +14,8 @@ from .config import Settings, engine_settings, get_settings
 from .db import CheckResultRow, Scan, sessionmaker, utcnow
 from .engine import ScanError, run_scan
 from .engine.checks import CHECKS
+from .engine.findings import LANGS, check_name, speed_fix_text, word
+from .engine.impact import impact_groups, severity
 from .engine.models import Category, CheckResult, Status
 from .engine.scoring import agent_band, agent_level, agent_score, band_for, band_label, score_results
 
@@ -49,9 +51,18 @@ def apply_score(scan: Scan, rows: list[CheckResultRow]) -> None:
     scan.agent_score = agent_score(results)
 
 
-def agent_json(score: int | None) -> dict[str, Any]:
+def agent_json(score: int | None, lang: str = "en") -> dict[str, Any]:
     level, label = agent_level(score)
+    if lang == "bn" and level:
+        from .engine.findings_bn import AGENT_LABELS_BN
+
+        label = AGENT_LABELS_BN.get(level, label)
     return {"score": score, "level": level, "label": label, "band": agent_band(score)}
+
+
+def pick_lang(*choices: str | None) -> str:
+    """The first supported language among the choices, else English."""
+    return next((c for c in choices if c in LANGS), "en")
 
 
 async def load_scan(session: AsyncSession, *, scan_id: int | None = None, token: str | None = None) -> Scan | None:
@@ -184,13 +195,46 @@ async def resend_report(session: AsyncSession, scan: Scan, settings: Settings) -
     schedule_report(scan.id, 0, settings)
 
 
-def serialize(scan: Scan, settings: Settings | None = None) -> dict[str, Any]:
+def localise(r: CheckResult, lang: str, extra: dict[str, Any]) -> dict[str, str]:
+    """The wording for one stored result in `lang`, rebuilt from its reason and evidence.
+
+    Results store the English wording of the day; the reason code and evidence are enough
+    to write it again in any language (and with any wording fixes made since).
+    """
+    reason = (r.evidence or {}).get("reason")
+    if not reason:
+        return {"name": r.name, "title": r.title, "summary": r.summary, "why": r.why, "fix": r.fix}
+    text = word(r.key, r.name, r.status.value, reason, r.evidence, extra, lang)
+    return {"name": check_name(r.key, r.name, lang), "title": text["title"], "summary": text["summary"],
+            "why": text["why"], "fix": text["fix"]}
+
+
+# Big or internal evidence the web app does not need.
+HIDDEN_EVIDENCE = ("error", "screenshot", "fixes")
+
+
+def serialize(scan: Scan, settings: Settings | None = None, lang: str | None = None) -> dict[str, Any]:
+    lang = pick_lang(lang, scan.lang)
     # Only checks that still exist: older scans also hold results of retired checks (the
     # backup question), which must not show up or count in the area scores.
     rows = sorted((r for r in scan.results if r.check_key in ORDER), key=lambda r: r.position)
     results = [result_from_row(r) for r in rows]
     _, _, cats = score_results(results)
+    extra = {"host": scan.site.host, "apex": scan.site.apex}
+    if lang == "bn":
+        from .engine.findings_bn import BAND_LABELS_BN, CATEGORY_LABELS_BN
+    items = []
+    speed = next((r for r in results if r.key == "mobile_speed"), None)
+    for r in results:
+        text = localise(r, lang, extra)
+        items.append({
+            "key": r.key, "name": text["name"], "category": r.category.value, "weight": r.weight,
+            "status": r.status.value, "severity": severity(r.key, r.status.value, (r.evidence or {}).get("reason", ""), r.weight),
+            "points": r.points, "title": text["title"], "summary": text["summary"],
+            "why": text["why"], "fix": text["fix"], "offer": r.offer, "critical": r.critical,
+            "evidence": {k: v for k, v in r.evidence.items() if k not in HIDDEN_EVIDENCE}})
     out: dict[str, Any] = {
+        "lang": lang,
         "token": scan.token,
         "status": scan.status,
         "host": scan.site.host,
@@ -200,28 +244,32 @@ def serialize(scan: Scan, settings: Settings | None = None) -> dict[str, Any]:
         "progress": {"done": len(rows), "total": len(CHECKS)},
         "score": scan.score,
         "band": scan.band,
-        "band_label": band_label(scan.band),
+        "band_label": (BAND_LABELS_BN.get(scan.band or "") if lang == "bn" else None) or band_label(scan.band),
         "capped": scan.capped,
         "coverage": scan.coverage,
-        "agent": agent_json(scan.agent_score),
+        "agent": agent_json(scan.agent_score, lang),
         "categories": [
-            {"key": c.category.value, "label": c.label, "score": c.score,
-             "earned": c.earned, "available": c.available}
+            {"key": c.category.value,
+             "label": CATEGORY_LABELS_BN.get(c.category.value, c.label) if lang == "bn" else c.label,
+             "score": c.score, "earned": c.earned, "available": c.available}
             for c in cats
         ],
-        "results": [
-            {"key": r.key, "name": r.name, "category": r.category.value, "weight": r.weight,
-             "status": r.status.value, "points": r.points, "title": r.title, "summary": r.summary,
-             "why": r.why, "fix": r.fix, "offer": r.offer, "critical": r.critical,
-             "evidence": {k: v for k, v in r.evidence.items() if k not in ("error",)}}
-            for r in results
-        ],
+        "results": items,
+        "impact": impact_groups(items, lang) if items else [],
+        # What would make the homepage load faster, and how it looked on the test phone.
+        "speed_fixes": speed_fix_text((speed.evidence or {}).get("fixes", []), lang) if speed else [],
+        "screenshot": (speed.evidence or {}).get("screenshot") if speed else None,
         "pending": [c.key for c in CHECKS if c.key not in {r.key for r in results}],
     }
     out["report_emailed"] = scan.emailed_at is not None
     out["report_status"] = report_status(scan)
     if scan.status == "failed":
-        out["error"] = {"code": scan.error_code, "message": scan.error_message}
+        message = scan.error_message
+        if lang == "bn":
+            from .messages_bn import to_bangla
+
+            message = to_bangla(message)
+        out["error"] = {"code": scan.error_code, "message": message}
     return out
 
 

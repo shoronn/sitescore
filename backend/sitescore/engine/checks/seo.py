@@ -1,7 +1,10 @@
 """Search and sharing basics: what Google and social apps see on the homepage."""
 from __future__ import annotations
 
+import json
 import re
+import secrets
+from urllib.parse import urljoin, urlsplit
 
 from ..models import Category, Outcome, Status
 from .base import check
@@ -11,7 +14,7 @@ def _unreadable(ctx_page_ok: bool) -> Outcome:
     return Outcome(Status.NOT_CHECKED, {}, "unreachable" if not ctx_page_ok else "not_html")
 
 
-@check("meta_tags", "Title and description", Category.SEO, 3)
+@check("meta_tags", "Title and description", Category.SEO, 2)
 async def check_meta_tags(ctx) -> Outcome:
     page = await ctx.main_page()
     info = await ctx.page_info()
@@ -31,7 +34,7 @@ async def check_meta_tags(ctx) -> Outcome:
     return Outcome(Status.PASS, ev, "ok")
 
 
-@check("mobile_viewport", "Mobile-friendly setup", Category.SEO, 3)
+@check("mobile_viewport", "Mobile-friendly setup", Category.SEO, 2)
 async def check_mobile_viewport(ctx) -> Outcome:
     page = await ctx.main_page()
     info = await ctx.page_info()
@@ -124,3 +127,143 @@ async def check_social_preview(ctx) -> Outcome:
     if og["title"] and og["image"]:
         return Outcome(Status.PASS, ev, "ok") if favicon else Outcome(Status.WARN, ev, "no_favicon")
     return Outcome(Status.WARN, ev, "partial")
+
+
+# ---------------------------------------------------------------- canonical address
+
+
+def _same_site(a: str, b: str) -> bool:
+    ha, hb = (urlsplit(x).hostname or "" for x in (a, b))
+    strip = lambda h: h[4:] if h.startswith("www.") else h  # noqa: E731
+    return strip(ha.lower()) == strip(hb.lower())
+
+
+@check("canonical", "Main page address", Category.SEO, 1)
+async def check_canonical(ctx) -> Outcome:
+    page = await ctx.main_page()
+    info, _rendered = await ctx.content_info()
+    if info is None:
+        return _unreadable(page.ok)
+    href = next((link.get("href", "").strip() for link in info.links
+                 if "canonical" in (link.get("rel") or "").lower().split() and link.get("href")), "")
+    base = page.final_url or f"https://{ctx.host}/"
+    if not href:
+        return Outcome(Status.WARN, {}, "missing")
+    url = urljoin(base, href)
+    ev = {"canonical": url[:200]}
+    if not _same_site(url, base):
+        return Outcome(Status.WARN, ev, "other_site")
+    if base.startswith("https://") and url.startswith("http://"):
+        return Outcome(Status.WARN, ev, "insecure")
+    return Outcome(Status.PASS, ev, "ok")
+
+
+# ---------------------------------------------------------------- structured data
+
+_BUSINESS_TYPES = {
+    "organization", "corporation", "localbusiness", "ngo", "educationalorganization", "school",
+    "collegeoruniversity", "medicalorganization", "hospital", "restaurant", "store", "hotel", "dentist",
+    "physician", "attorney", "realestateagent", "travelagency", "autorepair", "pharmacy", "medicalclinic",
+    "governmentorganization", "onlinebusiness", "onlinestore", "newsmediaorganization", "airline",
+    "bakery", "cafeorcoffeeshop", "barorpub", "beautysalon", "dayspa", "gym", "lodgingbusiness",
+}
+_BUSINESS_SUFFIXES = ("business", "store", "service", "organization", "agency", "restaurant", "clinic", "shop")
+
+
+def _types(node: dict) -> list[str]:
+    t = node.get("@type")
+    items = t if isinstance(t, list) else [t]
+    return [x.rsplit("/", 1)[-1] for x in items if isinstance(x, str)]
+
+
+def _nodes(data) -> list[dict]:
+    """Every object in a JSON-LD block, including those inside @graph and nested values."""
+    out: list[dict] = []
+    stack = [data]
+    while stack and len(out) < 500:
+        item = stack.pop()
+        if isinstance(item, list):
+            stack.extend(item)
+        elif isinstance(item, dict):
+            out.append(item)
+            stack.extend(v for v in item.values() if isinstance(v, (list, dict)))
+    return out
+
+
+def is_business(t: str) -> bool:
+    t = t.lower()
+    return t in _BUSINESS_TYPES or t.endswith(_BUSINESS_SUFFIXES)
+
+
+def read_structured_data(info) -> dict:
+    """What the homepage tells Google about the business in schema.org markup."""
+    types: list[str] = []
+    business: dict | None = None
+    invalid = 0
+    for block in info.jsonld:
+        try:
+            data = json.loads(block.strip().rstrip(";"))
+        except ValueError:
+            invalid += 1
+            continue
+        for node in _nodes(data):
+            for t in _types(node):
+                if t not in types:
+                    types.append(t)
+                if business is None and is_business(t):
+                    business = node
+    micro = [m.rsplit("/", 1)[-1] for m in info.microdata if "schema.org" in m.lower()]
+    for t in micro:
+        if t not in types:
+            types.append(t)
+    out: dict = {"types": types[:12], "invalid": invalid}
+    if business is not None:
+        has = lambda k: bool(business.get(k))  # noqa: E731
+        out["business"] = _types(business)[0] if _types(business) else "Organization"
+        out["has"] = [k for k in ("name", "telephone", "address", "openingHours", "logo", "url")
+                      if has(k) or (k == "openingHours" and has("openingHoursSpecification"))
+                      or (k == "telephone" and has("contactPoint"))]
+    elif any(is_business(t) for t in micro):
+        out["business"] = next(t for t in micro if is_business(t))
+        out["has"] = ["name"]
+        out["microdata"] = True
+    return out
+
+
+@check("structured_data", "Business details for Google", Category.SEO, 2)
+async def check_structured_data(ctx) -> Outcome:
+    page = await ctx.main_page()
+    info, _rendered = await ctx.content_info()
+    if info is None:
+        return _unreadable(page.ok)
+    sd = read_structured_data(info)
+    if not sd["types"]:
+        return Outcome(Status.WARN, sd, "invalid" if sd["invalid"] else "missing")
+    if "business" not in sd:
+        return Outcome(Status.WARN, sd, "no_business")
+    if sd.get("microdata"):
+        return Outcome(Status.PASS, sd, "ok")
+    if "name" not in sd["has"] or not ({"telephone", "address"} & set(sd["has"])):
+        sd["missing"] = [k for k in ("name", "telephone", "address") if k not in sd["has"]]
+        return Outcome(Status.WARN, sd, "incomplete")
+    return Outcome(Status.PASS, sd, "ok")
+
+
+# ---------------------------------------------------------------- page not found
+
+
+@check("error_page", "Missing-page handling", Category.SEO, 1)
+async def check_error_page(ctx) -> Outcome:
+    res = await ctx.probe(f"/sitescore-missing-page-{secrets.token_hex(4)}", max_bytes=2048)
+    if res.error or res.status is None:
+        return Outcome(Status.NOT_CHECKED, {}, "unreachable")
+    ev = {"status": res.status}
+    if res.status in (404, 410):
+        return Outcome(Status.PASS, ev, "ok")
+    if res.status == 200:
+        return Outcome(Status.WARN, ev, "soft_404")
+    if 300 <= res.status < 400:
+        return Outcome(Status.WARN, ev, "redirects")
+    if res.status >= 500:
+        return Outcome(Status.WARN, ev, "server_error")
+    return Outcome(Status.PASS, ev, "ok")

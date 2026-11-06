@@ -21,7 +21,8 @@ from .config import Settings, get_settings
 from .db import Lead, Scan, Site, get_session, utcnow
 from .engine import ScanError, guard
 from .ratelimit import RateLimiter
-from .scans import load_scan, serialize
+from .messages_bn import to_bangla, wants_bangla
+from .scans import load_scan, pick_lang, serialize
 from .security import (
     InputError, aware, clean_text, make_session, normalize_email, normalize_phone, read_session,
     verify_turnstile,
@@ -96,16 +97,20 @@ def create_app() -> FastAPI:
         return response
 
     @app.exception_handler(HTTPException)
-    async def http_error(_: Request, exc: HTTPException):
+    async def http_error(request: Request, exc: HTTPException):
         detail = exc.detail if isinstance(exc.detail, dict) else {"error": "error", "message": str(exc.detail)}
+        if wants_bangla(request.headers.get("accept-language")) and not request.url.path.startswith("/api/admin"):
+            detail = {**detail, "message": to_bangla(detail.get("message"))}
         return JSONResponse(detail, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error(_: Request, exc: RequestValidationError):
+    async def validation_error(request: Request, exc: RequestValidationError):
         first = exc.errors()[0] if exc.errors() else {}
         field = str(first.get("loc", ["", ""])[-1])
-        return JSONResponse({"error": "invalid", "field": field, "message": "Please check this field."},
-                            status_code=422)
+        message = "Please check this field."
+        if wants_bangla(request.headers.get("accept-language")):
+            message = to_bangla(message)
+        return JSONResponse({"error": "invalid", "field": field, "message": message}, status_code=422)
 
     app.include_router(router_factory())
     from .admin import router_factory as admin_router
@@ -159,6 +164,8 @@ class SignUp(BaseModel):
 
 class ScanRequest(BaseModel):
     url: str = Field(max_length=300)
+    # The visitor's language: the report email and PDF are written in it.
+    lang: str | None = Field(None, max_length=5)
 
 
 def lead_json(lead: Lead) -> dict[str, Any]:
@@ -270,14 +277,15 @@ def router_factory():
             site = Site(host=host, apex=apex)
             session.add(site)
             await session.flush()
-        scan = Scan(lead_id=lead.id, site_id=site.id, target=host, ip=ip)
+        scan = Scan(lead_id=lead.id, site_id=site.id, target=host, ip=ip, lang=pick_lang(body.lang))
         session.add(scan)
         await session.commit()
         enqueue_scan(scan.id, settings)
         return {"token": scan.token, "reused": False}
 
     @r.get("/scans/{token}")
-    async def get_scan(token: str, request: Request, session: SessionDep, settings: SettingsDep):
+    async def get_scan(token: str, request: Request, session: SessionDep, settings: SettingsDep,
+                       lang: str | None = None):
         scan = await load_scan(session, token=token[:40])
         if scan is None:
             raise ApiError(404, "not_found", "We could not find that scan.")
@@ -289,7 +297,7 @@ def router_factory():
             scan.error_code = "timeout"
             scan.error_message = "The scan took too long and was stopped. Please try again."
             await session.commit()
-        out = serialize(scan, settings)
+        out = serialize(scan, settings, lang)
         is_owner = read_session(settings, request.cookies.get(settings.cookie_name)) == scan.lead_id
         out["is_owner"] = is_owner
         out["callback_requested"] = bool(is_owner and scan.lead.callback_requested_at)
@@ -297,7 +305,8 @@ def router_factory():
         return out
 
     @r.get("/scans/{token}/report.pdf")
-    async def report_pdf(token: str, request: Request, session: SessionDep, settings: SettingsDep, ip: IpDep):
+    async def report_pdf(token: str, request: Request, session: SessionDep, settings: SettingsDep, ip: IpDep,
+                         lang: str | None = None):
         from .report import render_pdf
 
         limiter: RateLimiter = request.app.state.limiter
@@ -308,7 +317,7 @@ def router_factory():
             raise ApiError(404, "not_found", "The report is ready once the scan has finished.")
         if aware(scan.created_at) < utcnow() - timedelta(days=settings.results_link_days):
             raise ApiError(410, "expired", "This results link has expired. Run a new scan to see fresh results.")
-        pdf = await asyncio.to_thread(render_pdf, serialize(scan, settings), settings)
+        pdf = await asyncio.to_thread(render_pdf, serialize(scan, settings, lang), settings)
         day = (scan.finished_at or utcnow()).date().isoformat()
         return Response(pdf, media_type="application/pdf", headers={
             "Content-Disposition": f'attachment; filename="SiteScore-{scan.site.host}-{day}.pdf"',

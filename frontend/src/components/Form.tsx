@@ -1,5 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useId, useState } from "react";
+import { useT } from "../i18n";
 
 /** Label above a control, optional hint, and an error tied to the control for screen readers. */
 export function Field({
@@ -22,7 +23,7 @@ export function Field({
     <div>
       <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between px-1 text-[14px] font-semibold">
         {label}
-        {optional ? <span className="text-3 text-[13px] font-medium">Optional</span> : null}
+        {optional ? <span className="text-3 text-[13px] font-medium"><OptionalLabel /></span> : null}
       </label>
       {control}
       {error ? <ErrorText id={errId}>{error}</ErrorText> : null}
@@ -37,6 +38,10 @@ export function ErrorText({ children, id, className = "" }: { children: React.Re
       <span>{children}</span>
     </p>
   );
+}
+
+function OptionalLabel() {
+  return <>{useT().t("optional")}</>;
 }
 
 export function useMediaQuery(query: string): boolean {
